@@ -2,62 +2,64 @@ package mistral
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
-type ClientOption func(*Client)
-
-func WithBaseURL(baseURL string) ClientOption {
-	return func(c *Client) {
-		c.baseURL = strings.TrimSuffix(baseURL, "/")
-	}
-}
-
-func WithRateLimiter(limiter RateLimiter) ClientOption {
-	return func(c *Client) {
-		c.rateLimiter = limiter
-	}
-}
+const (
+	mistralBaseAPIURL = "https://api.mistral.ai"
+	defaultTimeout    = 5 * time.Second
+)
 
 type Client struct {
-	apiKey       string
-	timeout      time.Duration
-	modelName    string
-	modelVersion string
-	baseURL      string
-	rateLimiter  RateLimiter
+	apiKey      string
+	baseURL     string
+	rateLimiter RateLimiter
+	httpClient  *http.Client
 }
 
-func NewClient(apiKey string, modelName, modelVersion string, opts ...ClientOption) *Client {
+func NewClient(apiKey string, opts ...Option) *Client {
+	return newClientWithConfig(apiKey, NewConfig(opts...))
+}
+
+func newClientWithConfig(apiKey string, cfg *Config) *Client {
 	c := &Client{
-		apiKey:       apiKey,
-		timeout:      5 * time.Second,
-		modelName:    modelName,
-		modelVersion: modelVersion,
-		baseURL:      "https://api.mistral.com",
-		rateLimiter:  NewNoneRateLimiter(),
+		apiKey:      apiKey,
+		baseURL:     mistralBaseAPIURL,
+		rateLimiter: NewNoneRateLimiter(),
+		httpClient: &http.Client{
+			Timeout: defaultTimeout,
+		},
 	}
 
-	for _, opt := range opts {
-		opt(c)
+	if cfg.mistralAPIBaseURL != "" {
+		c.baseURL = cfg.mistralAPIBaseURL
+	}
+	if cfg.rateLimiter != nil {
+		c.rateLimiter = cfg.rateLimiter
+	}
+	if cfg.clientTimeout > 0 {
+		c.httpClient.Timeout = cfg.clientTimeout
+	}
+	if cfg.apiKey != "" {
+		c.apiKey = cfg.apiKey
 	}
 
 	return c
 }
 
-func (c *Client) ChatCompletion(messages []Message) (Message, error) {
+func (c *Client) ChatCompletion(ctx context.Context, messages []Message, model string) (Message, error) {
 	c.rateLimiter.Wait()
 
 	url := fmt.Sprintf("%s/v1/chat/completions", c.baseURL)
 
 	reqBody := ChatCompletionRequest{
 		Messages: messages,
-		Model:    c.modelName + "-" + c.modelVersion,
+		Model:    model,
 	}
 
 	jsonValue, err := json.Marshal(reqBody)
@@ -65,29 +67,11 @@ func (c *Client) ChatCompletion(messages []Message) (Message, error) {
 		return Message{}, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonValue))
+	response, err := sendRequest(ctx, c.httpClient, http.MethodPost, url, bytes.NewBuffer(jsonValue), c.apiKey)
 	if err != nil {
-		return Message{}, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Accept", "application/json; charset=utf-8")
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	client := &http.Client{
-		Timeout: c.timeout,
-	}
-
-	response, err := client.Do(req)
-	if err != nil {
-		return Message{}, fmt.Errorf("failed to make HTTP request: %w", err)
+		return Message{}, err
 	}
 	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		errResponseBody, _ := io.ReadAll(response.Body)
-		return Message{}, fmt.Errorf("HTTP request failed with status %s and body '%s'", response.Status, string(errResponseBody))
-	}
 
 	respBody, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -101,4 +85,27 @@ func (c *Client) ChatCompletion(messages []Message) (Message, error) {
 	}
 
 	return NewAssistantMessage(resp.Text()), nil
+}
+
+func sendRequest(ctx context.Context, client *http.Client, method, url string, body io.Reader, apiKey string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json; charset=utf-8")
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		errResponseBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("HTTP request failed with status %s and body '%s'", resp.Status, string(errResponseBody))
+	}
+
+	return resp, nil
 }
