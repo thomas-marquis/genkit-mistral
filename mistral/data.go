@@ -2,6 +2,11 @@ package mistral
 
 import "github.com/firebase/genkit/go/ai"
 
+type modelInfo struct {
+	Name     string
+	Versions []string
+}
+
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -65,6 +70,12 @@ func newRequestFromModelRequest(mr *ai.ModelRequest, modelName string) ChatCompl
 	return req
 }
 
+type UsageResponse struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 type ChatCompletionResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
@@ -75,11 +86,28 @@ type ChatCompletionResponse struct {
 		Message      Message `json:"message"`
 		FinishReason string  `json:"finish_reason"`
 	} `json:"choices"`
-	Usage struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+	Usage UsageResponse `json:"usage"`
+}
+
+type EmbeddingVector []float32
+
+type EmbeddingRequest struct {
+	Model           string   `json:"model"`
+	Input           []string `json:"input"`
+	OutputDimension int      `json:"output_dimension,omitempty"`
+	OutputDtype     string   `json:"output_dtype,omitempty"`
+}
+
+type EmbeddingResponse struct {
+	ID     string        `json:"id"`
+	Object string        `json:"object"`
+	Model  string        `json:"model"`
+	Usage  UsageResponse `json:"usage"`
+	Data   []struct {
+		Object    string          `json:"object"`
+		Embedding EmbeddingVector `json:"embedding"`
+		Index     int             `json:"index"`
+	} `json:"data"`
 }
 
 func (r ChatCompletionResponse) Text() string {
