@@ -34,7 +34,7 @@ func Test_MistralClient(t *testing.T) {
 
 	t.Run("Successful ChatCompletion", func(t *testing.T) {
 		// Given
-		client := mistral.NewClient(fakeApiKey, "mistral-large", "latest", mistral.WithBaseURL(mockServer.URL))
+		client := mistral.NewClient(fakeApiKey, "mistral-large", "latest", mistral.WithBaseAPIURL(mockServer.URL))
 		inputMsgs := []mistral.Message{
 			mistral.NewSystemMessage("You are a helpful assistant."),
 			mistral.NewHumanMessage("Hello!"),

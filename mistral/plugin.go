@@ -12,11 +12,13 @@ const providerID = "mistral"
 type Plugin struct {
 	APIKey string
 	Client *Client
+	config *Config
 }
 
-func NewPlugin(apiKey string) *Plugin {
+func NewPlugin(apiKey string, opts ...Option) *Plugin {
 	return &Plugin{
 		APIKey: apiKey,
+		config: NewConfig(opts...),
 	}
 }
 
@@ -25,10 +27,9 @@ func (p *Plugin) Name() string {
 }
 
 func (p *Plugin) Init(ctx context.Context, g *genkit.Genkit) error {
-	c := NewClient(p.APIKey, "mistral-large", "latest")
+	c := newClientWithConfig(p.APIKey, "mistral-large", "latest", p.config)
 	p.Client = c
 	defineModel(g, c)
-
 	return nil
 }
 

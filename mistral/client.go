@@ -6,45 +6,51 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
-type ClientOption func(*Client)
-
-func WithBaseURL(baseURL string) ClientOption {
-	return func(c *Client) {
-		c.baseURL = strings.TrimSuffix(baseURL, "/")
-	}
-}
-
-func WithRateLimiter(limiter RateLimiter) ClientOption {
-	return func(c *Client) {
-		c.rateLimiter = limiter
-	}
-}
+const (
+	mistralBaseAPIURL = "https://api.mistral.com"
+)
 
 type Client struct {
 	apiKey       string
-	timeout      time.Duration
 	modelName    string
 	modelVersion string
 	baseURL      string
 	rateLimiter  RateLimiter
+	httpClient   *http.Client
 }
 
-func NewClient(apiKey string, modelName, modelVersion string, opts ...ClientOption) *Client {
+func NewClient(apiKey string, modelName, modelVersion string, opts ...Option) *Client {
+	return newClientWithConfig(apiKey, modelName, modelVersion, NewConfig(opts...))
+}
+
+func newClientWithConfig(apiKey string, modelName, modelVersion string, cfg *Config) *Client {
+	timeout := 5 * time.Second
+
 	c := &Client{
 		apiKey:       apiKey,
-		timeout:      5 * time.Second,
 		modelName:    modelName,
 		modelVersion: modelVersion,
-		baseURL:      "https://api.mistral.com",
+		baseURL:      mistralBaseAPIURL,
 		rateLimiter:  NewNoneRateLimiter(),
+		httpClient: &http.Client{
+			Timeout: timeout,
+		},
 	}
 
-	for _, opt := range opts {
-		opt(c)
+	if cfg.mistralAPIBaseURL != "" {
+		c.baseURL = cfg.mistralAPIBaseURL
+	}
+	if cfg.rateLimiter != nil {
+		c.rateLimiter = cfg.rateLimiter
+	}
+	if cfg.clientTimeout > 0 {
+		c.httpClient.Timeout = cfg.clientTimeout
+	}
+	if cfg.apiKey != "" {
+		c.apiKey = cfg.apiKey
 	}
 
 	return c
@@ -74,11 +80,7 @@ func (c *Client) ChatCompletion(messages []Message) (Message, error) {
 	req.Header.Set("Accept", "application/json; charset=utf-8")
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
-	client := &http.Client{
-		Timeout: c.timeout,
-	}
-
-	response, err := client.Do(req)
+	response, err := c.httpClient.Do(req)
 	if err != nil {
 		return Message{}, fmt.Errorf("failed to make HTTP request: %w", err)
 	}
