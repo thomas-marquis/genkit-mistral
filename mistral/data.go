@@ -130,9 +130,22 @@ func parseMsgContent(content []*ai.Part) string {
 	return msg
 }
 
+func mapRoleFromGenkit(role ai.Role) string {
+	switch role {
+	case ai.RoleUser:
+		return RoleHuman
+	case ai.RoleModel:
+		return RoleAssistant
+	case ai.RoleSystem:
+		return RoleSystem
+	default:
+		return string(role) // Fallback to the string representation of the role
+	}
+}
+
 func newMistralMessageFromGenkit(msg *ai.Message) Message {
 	return Message{
-		Role:    string(msg.Role),
+		Role:    mapRoleFromGenkit(msg.Role),
 		Content: parseMsgContent(msg.Content),
 	}
 }
