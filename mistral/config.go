@@ -10,6 +10,7 @@ type Config struct {
 	mistralAPIBaseURL string
 	rateLimiter       RateLimiter
 	apiKey            string
+	verbose           bool
 }
 
 func NewConfig(opts ...Option) *Config {
@@ -45,5 +46,11 @@ func WithRateLimiter(rateLimiter RateLimiter) Option {
 func WithAPIKey(apiKey string) Option {
 	return func(cfg *Config) {
 		cfg.apiKey = apiKey
+	}
+}
+
+func WithVerbose(verbose bool) Option {
+	return func(cfg *Config) {
+		cfg.verbose = verbose
 	}
 }
