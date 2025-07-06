@@ -20,6 +20,7 @@ type Client struct {
 	baseURL     string
 	rateLimiter RateLimiter
 	httpClient  *http.Client
+	verbose     bool
 }
 
 func NewClient(apiKey string, opts ...Option) *Client {
@@ -34,6 +35,7 @@ func newClientWithConfig(apiKey string, cfg *Config) *Client {
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
+		verbose: cfg.verbose,
 	}
 
 	if cfg.mistralAPIBaseURL != "" {
@@ -77,7 +79,9 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message, model s
 	if err != nil {
 		return Message{}, fmt.Errorf("failed to read response body: %w", err)
 	}
-	logger.Printf("ChatCompletion called")
+	if c.verbose {
+		logger.Printf("ChatCompletion called")
+	}
 
 	var resp ChatCompletionResponse
 	err = json.Unmarshal(respBody, &resp)
@@ -114,7 +118,9 @@ func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	logger.Println("TextEmbedding called")
+	if c.verbose {
+		logger.Println("TextEmbedding called")
+	}
 
 	var resp EmbeddingResponse
 	err = json.Unmarshal(respBody, &resp)
