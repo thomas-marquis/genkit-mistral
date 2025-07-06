@@ -118,11 +118,16 @@ func (r ChatCompletionResponse) Text() string {
 }
 
 func parseMsgContent(content []*ai.Part) string {
-	if len(content) != 1 || (len(content) >= 1 && content[0].Kind != ai.PartText) {
-		logger.Println("Unexpected message content: %w", content)
-		return ""
+	var msg string
+	for _, part := range content {
+		if part.Kind == ai.PartText {
+			msg += part.Text + "\n"
+		} else {
+			logger.Printf("Unexpected message content part: %v\n", part)
+		}
 	}
-	return content[0].Text
+
+	return msg
 }
 
 func newMistralMessageFromGenkit(msg *ai.Message) Message {

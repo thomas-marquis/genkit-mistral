@@ -36,6 +36,10 @@ func defineModel(g *genkit.Genkit, client *Client, modelName string, versions []
 			}
 			var _ = cfg
 
+			if mr.Docs != nil {
+
+			}
+
 			if len(mr.Messages) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}

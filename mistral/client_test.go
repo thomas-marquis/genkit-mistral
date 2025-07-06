@@ -1,6 +1,7 @@
 package mistral_test
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/thomas-marquis/genkit-mistral/mistral"
 	"net/http"
@@ -34,14 +35,15 @@ func Test_MistralClient(t *testing.T) {
 
 	t.Run("Successful ChatCompletion", func(t *testing.T) {
 		// Given
-		client := mistral.NewClient(fakeApiKey, "mistral-large", "latest", mistral.WithBaseAPIURL(mockServer.URL))
+		ctx := context.TODO()
+		client := mistral.NewClient(fakeApiKey, mistral.WithBaseAPIURL(mockServer.URL))
 		inputMsgs := []mistral.Message{
 			mistral.NewSystemMessage("You are a helpful assistant."),
 			mistral.NewHumanMessage("Hello!"),
 		}
 
 		// When
-		res, err := client.ChatCompletion(inputMsgs)
+		res, err := client.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large")
 
 		// Then
 		expected := mistral.NewAssistantMessage("Hello, how can I assist you?")
