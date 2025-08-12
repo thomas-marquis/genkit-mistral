@@ -43,7 +43,7 @@ func Test_MistralClient(t *testing.T) {
 		}
 
 		// When
-		res, err := client.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large")
+		res, err := client.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistral.ModelConfig{})
 
 		// Then
 		expected := mistral.NewAssistantMessage("Hello, how can I assist you?")

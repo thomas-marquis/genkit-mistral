@@ -16,6 +16,10 @@ var (
 			Versions: []string{"mistral-medium-latest", "mistral-medium-2505"},
 		},
 		{
+			Name:     "mistral-medium-latest",
+			Versions: []string{},
+		},
+		{
 			Name:     "ministral-3b",
 			Versions: []string{"ministral-3b-2410", "ministral-3b-latest"},
 		},
@@ -25,11 +29,19 @@ var (
 		},
 		{
 			Name:     "mistral-tiny",
-			Versions: []string{"open-mistral-7b", "mistral-tiny-2312", "mistral-tiny-latest", "open-mistral-nemo", "open-mistral-nemo-2407", "mistral-tiny-2407"},
+			Versions: []string{"mistral-tiny-2312", "mistral-tiny-latest", "open-mistral-nemo", "open-mistral-nemo-2407", "mistral-tiny-2407"},
+		},
+		{
+			Name:     "mistral-tiny-latest",
+			Versions: []string{},
 		},
 		{
 			Name:     "mistral-small",
-			Versions: []string{"open-mixtral-8x7b", "mistral-small-2312", "mistral-small-latest", "mistral-small-2409", "mistral-small-2501", "mistral-small-2503", "mistral-small-2506"},
+			Versions: []string{"mistral-small-2312", "mistral-small-latest", "mistral-small-2409", "mistral-small-2501", "mistral-small-2503", "mistral-small-2506"},
+		},
+		{
+			Name:     "mistral-small-latest",
+			Versions: []string{},
 		},
 		{
 			Name:     "open-mixtral-8x22b",
@@ -38,6 +50,10 @@ var (
 		{
 			Name:     "mistral-large",
 			Versions: []string{"mistral-large-2407", "mistral-large-2411", "mistral-large-latest"},
+		},
+		{
+			Name:     "mistral-large-latest",
+			Versions: []string{},
 		},
 		{
 			Name:     "pixtral-large",
@@ -97,12 +113,17 @@ func (p *Plugin) Name() string {
 func (p *Plugin) Init(ctx context.Context, g *genkit.Genkit) error {
 	c := newClientWithConfig(p.APIKey, p.config)
 	p.Client = c
+
 	for _, model := range allModelsAndVersions {
 		defineModel(g, c, model.Name, model.Versions)
 	}
+	defineFakeModel(g)
+
 	for _, model := range allEmbeddingsAndVersions {
 		defineEmbedder(g, c, model.Name, model.Versions)
 	}
+	defineFakeEmbedder(g)
+
 	return nil
 }
 

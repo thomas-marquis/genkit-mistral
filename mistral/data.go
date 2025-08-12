@@ -57,6 +57,8 @@ type ChatCompletionRequest struct {
 	Stream      bool      `json:"stream,omitempty"`
 	MaxTokens   int       `json:"max_tokens,omitempty"`
 	Temperature float64   `json:"temperature,omitempty"`
+	TopP        int       `json:"top_p,omitempty"`
+	Stop        []string  `json:"stop,omitempty"`
 }
 
 func newRequestFromModelRequest(mr *ai.ModelRequest, modelName string) ChatCompletionRequest {

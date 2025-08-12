@@ -54,14 +54,19 @@ func newClientWithConfig(apiKey string, cfg *Config) *Client {
 	return c
 }
 
-func (c *Client) ChatCompletion(ctx context.Context, messages []Message, model string) (Message, error) {
+func (c *Client) ChatCompletion(ctx context.Context, messages []Message, model string, cfg *ModelConfig) (Message, error) {
 	c.rateLimiter.Wait()
 
 	url := fmt.Sprintf("%s/v1/chat/completions", c.baseURL)
 
 	reqBody := ChatCompletionRequest{
-		Messages: messages,
-		Model:    model,
+		Messages:    messages,
+		Model:       model,
+		Temperature: cfg.Temperature,
+		MaxTokens:   cfg.MaxOutputTokens,
+		TopP:        int(cfg.TopP),
+		Stream:      false, // TODO: Implement streaming later
+		Stop:        cfg.StopSequences,
 	}
 
 	jsonValue, err := json.Marshal(reqBody)
