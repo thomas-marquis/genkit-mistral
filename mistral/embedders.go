@@ -3,10 +3,11 @@ package mistral
 import (
 	"context"
 	"fmt"
+	"math/rand"
+
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/thomas-marquis/genkit-mistral/internal"
-	"math/rand"
 )
 
 const (
@@ -24,7 +25,7 @@ func newEmbeddingOptionsFromRaw(r map[string]any) *EmbeddingOptions {
 }
 
 func defineEmbedder(g *genkit.Genkit, client *Client, modelName string, versions []string) {
-	genkit.DefineEmbedder(g, providerID, modelName,
+	genkit.DefineEmbedder(g, providerID, modelName, &ai.EmbedderOptions{},
 		func(ctx context.Context, mr *ai.EmbedRequest) (*ai.EmbedResponse, error) {
 			if len(mr.Input) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
@@ -55,7 +56,7 @@ func defineEmbedder(g *genkit.Genkit, client *Client, modelName string, versions
 }
 
 func defineFakeEmbedder(g *genkit.Genkit) {
-	genkit.DefineEmbedder(g, providerID, "fake-embed",
+	genkit.DefineEmbedder(g, providerID, "fake-embed", &ai.EmbedderOptions{},
 		func(ctx context.Context, mr *ai.EmbedRequest) (*ai.EmbedResponse, error) {
 			if len(mr.Input) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")

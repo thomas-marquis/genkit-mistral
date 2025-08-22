@@ -42,10 +42,11 @@ func defineModel(g *genkit.Genkit, client *Client, modelName string, versions []
 		&ai.ModelInfo{
 			Label: strings.ToTitle(modelName),
 			Supports: &ai.ModelSupports{
-				Multiturn:  true,
-				SystemRole: true,
-				Media:      false,
-				Tools:      true,
+				Multiturn:   true,
+				SystemRole:  true,
+				Media:       false,
+				Tools:       true,
+				Constrained: ai.ConstrainedSupportAll,
 			},
 			Versions: versions,
 		},
@@ -59,7 +60,15 @@ func defineModel(g *genkit.Genkit, client *Client, modelName string, versions []
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
 			messages := mapMessagesToMistral(mr.Messages)
-			response, err := client.ChatCompletion(ctx, messages, modelName, cfg)
+
+			var formatOpt ChatCompletionOption
+			if mr.Output.Constrained && mr.Output.Format == "json" {
+				formatOpt = WithResponseJsonSchema(mr.Output.Schema)
+			} else {
+				formatOpt = WithResponseTextFormat()
+			}
+
+			response, err := client.ChatCompletion(ctx, messages, modelName, cfg, formatOpt)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
@@ -111,10 +120,12 @@ func getConfigFromRequest(mr *ai.ModelRequest) (*ModelConfig, error) {
 	switch m := mr.Config.(type) {
 	case *ModelConfig:
 		return m, nil
+	case ModelConfig:
+		return &m, nil
 	case map[string]any:
 		return newModelConfigFromRaw(m), nil
 	}
-	return nil, fmt.Errorf("invalid model request config type: expected ModelConfig, got %T", mr.Config)
+	return nil, fmt.Errorf("invalid model request config type: expected *mistral.ModelConfig, got %T", mr.Config)
 }
 
 // calculateFakeWordCount determines the number of words to generate for the fake model response.
