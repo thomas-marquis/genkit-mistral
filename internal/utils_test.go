@@ -1,11 +1,12 @@
 package internal_test
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/thomas-marquis/genkit-mistral/internal"
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/thomas-marquis/genkit-mistral/internal"
 )
 
 func Test_FakeText(t *testing.T) {

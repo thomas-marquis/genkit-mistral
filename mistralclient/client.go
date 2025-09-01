@@ -40,7 +40,8 @@ func NewClientWithConfig(apiKey string, cfg *Config) *Client {
 		baseURL:     mistralBaseAPIURL,
 		rateLimiter: NewNoneRateLimiter(),
 		httpClient: &http.Client{
-			Timeout: defaultTimeout,
+			Timeout:   defaultTimeout,
+			Transport: cfg.Transport,
 		},
 		verbose:          cfg.Verbose,
 		retryMaxRetries:  cfg.RetryMaxRetries,

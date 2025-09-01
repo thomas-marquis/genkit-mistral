@@ -1,6 +1,7 @@
 package mistralclient
 
 import (
+	"net/http"
 	"strings"
 	"time"
 
@@ -15,10 +16,13 @@ type Config struct {
 	Verbose           bool
 
 	// Retry configuration
+
 	RetryMaxRetries  int
 	RetryWaitMin     time.Duration
 	RetryWaitMax     time.Duration
 	RetryStatusCodes []int
+
+	Transport http.RoundTripper
 }
 
 func NewConfig(opts ...Option) *Config {

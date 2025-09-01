@@ -87,37 +87,6 @@ The client supports:
 
 ## Contributing 🤝
 
-### Code structure
+Contributions are welcome! Please open an issue or a PR.
 
-- mistral/ — Genkit plugin wiring (models, embedders, mapping between Genkit and Mistral)
-- mistralclient/ — Low-level HTTP client for Mistral (chat, embeddings, retries, rate limiting)
-- internal/ — Small helpers and test fixtures
-- scripts/ — Local CI helpers
-
-### Running tests
-
-- Package tests:
-  - `go test ./internal ./mistralclient`
-- Note: running `go test ./...` from the repo root may fail due to a known import cycle between `mistral` and `mistralclient` tests. Test packages individually as above.
-
-### Updating CI locally
-
-Install local tooling (GitHub Actions runner via `act`):
-
-```bash
-./scripts/install_act.sh
-```
-
-Run the workflow linter:
-
-```bash
-actionlint
-```
-
-Run a workflow locally:
-
-```bash
-./scripts/run_ci_local.sh <workflow_name>
-```
-
-— Happy hacking! 🛠️
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
