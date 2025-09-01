@@ -37,7 +37,7 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 
 			texts := make([]string, len(mr.Input), len(mr.Input))
 			for i, input := range mr.Input {
-				texts[i] = ParseMsgContent(input.Content)
+				texts[i] = StringFromParts(input.Content)
 			}
 
 			vectors, err := client.TextEmbedding(ctx, texts, modelName)
@@ -79,7 +79,7 @@ func defineFakeEmbedder() ai.Embedder {
 
 			texts := make([]string, len(mr.Input), len(mr.Input))
 			for i, input := range mr.Input {
-				texts[i] = ParseMsgContent(input.Content)
+				texts[i] = StringFromParts(input.Content)
 			}
 
 			vecSize := cfg.VectorSize

@@ -442,7 +442,7 @@ var (
 				ToolChoice:  false,
 				Tools:       false,
 			},
-			Versions: []string{"voxtral-mini-transcribe-2507", "voxtral-mini-2507", "voxtral-mini-latest"},
+			Versions: []string{"voxtral-mini-transcribe-2507"},
 		},
 	}
 

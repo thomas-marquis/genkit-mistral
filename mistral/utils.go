@@ -12,7 +12,9 @@ var (
 	logger = log.New(os.Stdout, "mistral-client: ", log.LstdFlags|log.Lshortfile)
 )
 
-func ParseMsgContent(content []*ai.Part) string {
+// StringFromParts returns the content of a multi-parts message as a string.
+// The multiple parts are concatenated with a newline character.
+func StringFromParts(content []*ai.Part) string {
 	var msg string
 	for _, part := range content {
 		if part.Kind == ai.PartText {
@@ -28,7 +30,7 @@ func ParseMsgContent(content []*ai.Part) string {
 func NewMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
 	return mistralclient.Message{
 		Role:    RoleFromGenkit(msg.Role),
-		Content: ParseMsgContent(msg.Content),
+		Content: StringFromParts(msg.Content),
 	}
 }
 
