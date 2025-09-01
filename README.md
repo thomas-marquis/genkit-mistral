@@ -2,7 +2,7 @@
 
 Enables Mistral AI support for Firebase Genkit (Go SDK). Build agents and apps with Genkit while calling Mistral models and embeddings with a clean, typed Go API.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/thomas-marquis/genkit-mistral.svg)](https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENCE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/thomas-marquis/genkit-mistral.svg)](https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENCE)
 
 ## Quick start 🚀
 
@@ -13,13 +13,12 @@ go get github.com/firebase/genkit/go
 go get github.com/thomas-marquis/genkit-mistral
 ```
 
-Set your Mistral API key (for example in your shell):
+## Usage
 
-```bash
-export MISTRAL_API_KEY=your_api_key_here
-```
+See the full API and more examples in the Go reference: https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral
 
-Minimal usage with the low-level client (straightforward and great for scripts):
+
+### Basit text generation
 
 ```go
 package main
@@ -28,62 +27,126 @@ import (
     "context"
     "fmt"
     "os"
-    "github.com/thomas-marquis/genkit-mistral/mistralclient"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/ai"
+    "github.com/thomas-marquis/genkit-mistral/mistral"
 )
 
 func main() {
-    apiKey := getenv("MISTRAL_API_KEY", "")
-    client := mistralclient.NewClient(apiKey,
-        mistralclient.WithVerbose(true),
-        mistralclient.WithRetry(3, 0, 0), // sensible defaults
-    )
+	mistralApiKey := os.Getenv("MISTRAL_API_KEY")
+	ctx := context.Background()
+	g := genkit.Init(ctx,
+		genkit.WithPlugins(
+			mistral.NewPlugin(mistralApiKey),
+		),
+		genkit.WithDefaultModel("mistral/mistral-small-latest"),
+	)
 
-    ctx := context.Background()
-    msg := []mistralclient.Message{
-        mistralclient.NewSystemMessage("You are a helpful assistant."),
-        mistralclient.NewHumanMessage("Say hello in one short sentence."),
-    }
-
-    resp, err := client.ChatCompletion(ctx, msg, "mistral-small-latest", &mistralclient.ModelConfig{
-        Temperature: 0.2,
-    }, mistralclient.WithResponseTextFormat())
-    if err != nil { panic(err) }
-
-    fmt.Println(resp.Content)
+	res, err := genkit.Generate(ctx, g,
+		ai.WithSystem("you are a helpful assistant"),
+		ai.WithPrompt("Tell me a joke"),
+	)
+	if err != nil {
+		panic(err)
+	}
+    fmt.Println(res.Text())
 }
-
-func getenv(k, def string) string { if v := os.Getenv(k); v != "" { return v }; return def }
 ```
 
-Using with Genkit (high-level) in your app: you create and init the plugin, then use models/embedders by name. Full Genkit samples live in the package docs, but the essence is:
+### Text embedding
 
 ```go
-// inside your setup/bootstrap code
-p := mistral.NewPlugin(os.Getenv("MISTRAL_API_KEY"))
-if err := p.Init(ctx, genkitInstance); err != nil { panic(err) }
+package main
 
-// Later, use a model by name (e.g., "mistral-small-latest") via Genkit's APIs.
+import (
+    "context"
+    "fmt"
+    "os"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/ai"
+    "github.com/thomas-marquis/genkit-mistral/mistral"
+)
+
+func main() {
+	mistralApiKey := os.Getenv("MISTRAL_API_KEY")
+	ctx := context.Background()
+	g := genkit.Init(ctx,
+		genkit.WithPlugins(
+			mistral.NewPlugin(mistralApiKey),
+		),
+	)
+
+	docToEmbed := ai.DocumentFromText("Is scribe a good situation?", nil)
+	res, err := genkit.Embed(ctx, g,
+		ai.WithDocs(docToEmbed),
+		ai.WithEmbedderName("mistral/mistral-embed"),
+	)
+	if err != nil {
+		panic(err)
+	}
+    fmt.Println(res.Embeddings[0].Embedding)
+}
 ```
 
-See the full API and more examples in the Go reference: https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral
+### Output format constrained
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/ai"
+    "github.com/thomas-marquis/genkit-mistral/mistral"
+)
+
+func main() {
+	mistralApiKey := os.Getenv("MISTRAL_API_KEY")
+	ctx := context.Background()
+	g := genkit.Init(ctx,
+		genkit.WithPlugins(
+			mistral.NewPlugin(mistralApiKey),
+		),
+		genkit.WithDefaultModel("mistral/mistral-small-latest"),
+	)
+
+	type expectedOutput struct {
+		JokeContent string `json:"joke_content"`
+		LolLevel    int    `json:"lol_level"`
+	}
+
+	res, err := genkit.Generate(ctx, g,
+		ai.WithSystem("you are a helpful assistant"),
+		ai.WithPrompt("Tell me a joke"),
+		ai.WithOutputType(expectedOutput{}),
+	)
+
+	if err != nil {
+		panic(err)
+    }
+	
+    var joke expectedOutput
+    if err := res.Output(&joke); err != nil {
+        fmt.Printf("Failed to parse output: %s\n", err)
+    } 
+    fmt.Printf("Is this \"%s\" really level %d???!!\n", joke.JokeContent, joke.LolLevel)
+}
+```
+
 
 ## Models and embeddings 🧠
 
-- Chat/completions: e.g. `mistral-small`, `mistral-large`, `codestral`, etc. (with `-latest` or versioned variants)
-- Embeddings: `mistral-embed`
 
-The client supports:
-- Configurable retries with exponential backoff and jitter
-- Pluggable rate limiting (token bucket)
-- JSON schema-constrained outputs (via `WithResponseJsonSchema`)
 
 ## Useful resources 📚
 
 | Resource      | For what?                                      | Link(s)                                                                                                             |
 |---------------|-------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | Mistral AI    | French AI provider                              | [Website](https://mistral.ai/) <br/> [API documentation](https://docs.mistral.ai/api/)                              |
-| La Plateforme | Mistral's cloud platform for developers         | [Website](https://mistral.ai/products/la-plateforme) <br/> [Pricing](https://mistral.ai/pricing#api-pricing)        |
 | Genkit        | Agentic framework (Go, Node.js, Python)         | [Docs](https://firebase.google.com/docs/genkit) <br/> [Go SDK](https://genkit.dev/go/docs/get-started-go/)          |
+| La Plateforme | Mistral's cloud platform for developers         | [Website](https://mistral.ai/products/la-plateforme) <br/> [Pricing](https://mistral.ai/pricing#api-pricing)        |
 
 ## Contributing 🤝
 
