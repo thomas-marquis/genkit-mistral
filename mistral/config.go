@@ -1,56 +1,25 @@
 package mistral
 
 import (
-	"strings"
-	"time"
+	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
 
 type Config struct {
-	clientTimeout     time.Duration
-	mistralAPIBaseURL string
-	rateLimiter       RateLimiter
-	apiKey            string
-	verbose           bool
-}
-
-func NewConfig(opts ...Option) *Config {
-	cfg := &Config{}
-
-	for _, opt := range opts {
-		opt(cfg)
-	}
-
-	return cfg
+	Client mistralclient.Config
 }
 
 type Option func(*Config)
 
-func WithClientTimeout(timeout time.Duration) Option {
-	return func(cfg *Config) {
-		cfg.clientTimeout = timeout
+func WithClientConfig(cfg mistralclient.Config) Option {
+	return func(c *Config) {
+		c.Client = cfg
 	}
 }
 
-func WithBaseAPIURL(baseURL string) Option {
-	return func(cfg *Config) {
-		cfg.mistralAPIBaseURL = strings.TrimSuffix(baseURL, "/")
+func NewConfig(opts ...Option) *Config {
+	c := &Config{}
+	for _, opt := range opts {
+		opt(c)
 	}
-}
-
-func WithRateLimiter(rateLimiter RateLimiter) Option {
-	return func(cfg *Config) {
-		cfg.rateLimiter = rateLimiter
-	}
-}
-
-func WithAPIKey(apiKey string) Option {
-	return func(cfg *Config) {
-		cfg.apiKey = apiKey
-	}
-}
-
-func WithVerbose(verbose bool) Option {
-	return func(cfg *Config) {
-		cfg.verbose = verbose
-	}
+	return c
 }
