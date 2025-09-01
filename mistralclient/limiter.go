@@ -1,4 +1,4 @@
-package mistral
+package mistralclient
 
 import (
 	"time"

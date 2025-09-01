@@ -7,48 +7,25 @@ import (
 	"math/rand"
 	"strings"
 
+	"github.com/firebase/genkit/go/core"
 	"github.com/thomas-marquis/genkit-mistral/internal"
+	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/genkit"
 )
 
 const (
 	defaultFakeResponseSize = 25
 )
 
-type ModelConfig struct {
-	MaxOutputTokens int      `json:"maxOutputTokens,omitempty"`
-	StopSequences   []string `json:"stopSequences,omitempty"`
-	Temperature     float64  `json:"temperature,omitempty"`
-	TopK            int      `json:"topK,omitempty"`
-	TopP            float64  `json:"topP,omitempty"`
-	Version         string   `json:"version,omitempty"`
-}
-
-func newModelConfigFromRaw(r map[string]any) *ModelConfig {
-	return &ModelConfig{
-		MaxOutputTokens: internal.GetOrZero[int](r, "maxOutputTokens"),
-		StopSequences:   internal.GetSliceOrNil[string](r, "stopSequences"),
-		Temperature:     internal.GetOrZero[float64](r, "temperature"),
-		TopK:            internal.GetOrZero[int](r, "topK"),
-		TopP:            internal.GetOrZero[float64](r, "topP"),
-		Version:         internal.GetOrZero[string](r, "version"),
-	}
-}
-
-func defineModel(g *genkit.Genkit, client *Client, modelName string, versions []string) {
-	genkit.DefineModel(g, providerID, modelName,
-		&ai.ModelInfo{
-			Label: strings.ToTitle(modelName),
-			Supports: &ai.ModelSupports{
-				Multiturn:   true,
-				SystemRole:  true,
-				Media:       false,
-				Tools:       true,
-				Constrained: ai.ConstrainedSupportAll,
-			},
-			Versions: versions,
+func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
+	return ai.NewModel(
+		core.NewName(providerID, modelName),
+		&ai.ModelOptions{
+			Label:    modelInfo.Label,
+			Stage:    modelInfo.Stage,
+			Supports: modelInfo.Supports,
+			Versions: modelInfo.Versions,
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
 			cfg, err := getConfigFromRequest(mr)
@@ -59,29 +36,55 @@ func defineModel(g *genkit.Genkit, client *Client, modelName string, versions []
 			if len(mr.Messages) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
-			messages := mapMessagesToMistral(mr.Messages)
+			messages := MapMessagesToMistral(mr.Messages)
 
-			var formatOpt ChatCompletionOption
+			var formatOpt mistralclient.ChatCompletionOption
 			if mr.Output.Constrained && mr.Output.Format == "json" {
-				formatOpt = WithResponseJsonSchema(mr.Output.Schema)
+				formatOpt = mistralclient.WithResponseJsonSchema(mr.Output.Schema)
 			} else {
-				formatOpt = WithResponseTextFormat()
+				formatOpt = mistralclient.WithResponseTextFormat()
 			}
 
-			response, err := client.ChatCompletion(ctx, messages, modelName, cfg, formatOpt)
+			response, err := c.ChatCompletion(ctx, messages, modelName, cfg, formatOpt)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
 
-			return mapResponse(mr, response.Content), nil
+			return MapResponse(mr, response.Content), nil
 		},
 	)
 }
 
-func defineFakeModel(g *genkit.Genkit) {
+func defineModel(c *mistralclient.Client, modelName string, modelInfos ai.ModelInfo) []ai.Model {
+	var defined []ai.Model
+
+	defined = append(defined, defineSingleModel(c, modelName, &modelInfos))
+
+	if len(modelInfos.Versions) == 0 {
+		return defined
+	}
+
+	for _, version := range modelInfos.Versions {
+		if version == modelName {
+			continue
+		}
+		mi := &ai.ModelInfo{
+			Label:    version,
+			Stage:    modelInfos.Stage,
+			Supports: modelInfos.Supports,
+			Versions: modelInfos.Versions,
+		}
+		defined = append(defined, defineSingleModel(c, version, mi))
+	}
+
+	return defined
+}
+
+func defineFakeModel() ai.Model {
 	modelName := "fake-completion"
-	genkit.DefineModel(g, providerID, modelName,
-		&ai.ModelInfo{
+	return ai.NewModel(
+		core.NewName(providerID, modelName),
+		&ai.ModelOptions{
 			Label: strings.ToTitle(modelName),
 			Supports: &ai.ModelSupports{
 				Multiturn:  true,
@@ -89,7 +92,7 @@ func defineFakeModel(g *genkit.Genkit) {
 				Media:      false,
 				Tools:      true,
 			},
-			Versions: []string{"fake-completion", "fake-completion-latest"},
+			Versions: []string{"fake-completion"},
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
 			cfg, err := getConfigFromRequest(mr)
@@ -108,22 +111,22 @@ func defineFakeModel(g *genkit.Genkit) {
 				return nil, fmt.Errorf("failed to generate fake response: %w", err)
 			}
 
-			return mapResponse(mr, fakeResponse), nil
+			return MapResponse(mr, fakeResponse), nil
 		},
 	)
 }
 
-func getConfigFromRequest(mr *ai.ModelRequest) (*ModelConfig, error) {
+func getConfigFromRequest(mr *ai.ModelRequest) (*mistralclient.ModelConfig, error) {
 	if mr.Config == nil {
-		return &ModelConfig{}, nil
+		return &mistralclient.ModelConfig{}, nil
 	}
 	switch m := mr.Config.(type) {
-	case *ModelConfig:
+	case *mistralclient.ModelConfig:
 		return m, nil
-	case ModelConfig:
+	case mistralclient.ModelConfig:
 		return &m, nil
 	case map[string]any:
-		return newModelConfigFromRaw(m), nil
+		return mistralclient.NewModelConfigFromRaw(m), nil
 	}
 	return nil, fmt.Errorf("invalid model request config type: expected *mistral.ModelConfig, got %T", mr.Config)
 }
@@ -153,19 +156,11 @@ func calculateFakeWordCount(temperature float64, maxOutputTokens int) int {
 		return maxWords
 	}
 
-	// We map temperature to an exponent to skew the random number distribution.
-	// An exponent < 1 skews towards 1 (maxWords), and an exponent > 1 skews towards 0 (minWords).
-	// We map temperature [0,1] to exponent [~0.1, 10].
-	// temp=0.5 corresponds to exponent=1 (uniform distribution).
 	exponent := math.Pow(10, 2*temperature-1)
 
-	// Generate a random factor and skew it.
 	randomFactor := rand.Float64()
 	skewedRandomFactor := math.Pow(randomFactor, exponent)
 
-	// Map the skewed factor to the word count range.
-	// Low temp -> high skewed factor -> closer to maxWords.
-	// High temp -> low skewed factor -> closer to minWords.
 	wordCountRange := float64(maxWords - minWords)
 	words := float64(minWords) + wordCountRange*skewedRandomFactor
 

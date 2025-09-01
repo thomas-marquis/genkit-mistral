@@ -1,11 +1,12 @@
-package mistral_test
+package mistralclient_test
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/thomas-marquis/genkit-mistral/mistral"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
 
 const (
@@ -45,7 +46,7 @@ func timeUntilAllUnlocked(t *testing.T, blockingFunc func(), nb int, startedAt t
 
 func TestBucketCallsRateLimiter_ShouldAllowFirstCall(t *testing.T) {
 	// Given
-	rateLimiter := mistral.NewBucketCallsRateLimiter(10, 10, time.Second)
+	rateLimiter := mistralclient.NewBucketCallsRateLimiter(10, 10, time.Second)
 	defer rateLimiter.Stop()
 	var elapsed time.Duration
 	start := time.Now()
@@ -59,7 +60,7 @@ func TestBucketCallsRateLimiter_ShouldAllowFirstCall(t *testing.T) {
 
 func TestBucketCallsRateLimiter_ShouldNotAllowWhenRateIsReached(t *testing.T) {
 	// Given
-	rateLimiter := mistral.NewBucketCallsRateLimiter(1, 1, time.Second)
+	rateLimiter := mistralclient.NewBucketCallsRateLimiter(1, 1, time.Second)
 	defer rateLimiter.Stop()
 	var elapsed time.Duration
 	start := time.Now()
@@ -77,7 +78,7 @@ func TestBucketCallsRateLimiter_ShouldNotAllowWhenRateIsReached(t *testing.T) {
 
 func TestBucketCallsRateLimiter_ShouldBeAbleToHandleManyRequests(t *testing.T) {
 	// Given
-	rateLimiter := mistral.NewBucketCallsRateLimiter(5, 10, time.Second)
+	rateLimiter := mistralclient.NewBucketCallsRateLimiter(5, 10, time.Second)
 	defer rateLimiter.Stop()
 	var elapsed time.Duration
 	start := time.Now()
@@ -105,7 +106,7 @@ func TestBucketCallsRateLimiter_ShouldBeAbleToHandleManyRequests(t *testing.T) {
 func TestNoneRateLimiter_ShouldAllowsAll(t *testing.T) {
 	// Given
 	var elapsed time.Duration
-	rateLimiter := mistral.NewNoneRateLimiter()
+	rateLimiter := mistralclient.NewNoneRateLimiter()
 
 	start := time.Now()
 

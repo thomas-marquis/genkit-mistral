@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/core"
 	"github.com/thomas-marquis/genkit-mistral/internal"
+	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
 
 const (
@@ -24,8 +26,10 @@ func newEmbeddingOptionsFromRaw(r map[string]any) *EmbeddingOptions {
 	}
 }
 
-func defineEmbedder(g *genkit.Genkit, client *Client, modelName string, versions []string) {
-	genkit.DefineEmbedder(g, providerID, modelName, &ai.EmbedderOptions{},
+func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder {
+	return ai.NewEmbedder(
+		core.NewName(providerID, modelName),
+		&ai.EmbedderOptions{},
 		func(ctx context.Context, mr *ai.EmbedRequest) (*ai.EmbedResponse, error) {
 			if len(mr.Input) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
@@ -33,7 +37,7 @@ func defineEmbedder(g *genkit.Genkit, client *Client, modelName string, versions
 
 			texts := make([]string, len(mr.Input), len(mr.Input))
 			for i, input := range mr.Input {
-				texts[i] = parseMsgContent(input.Content)
+				texts[i] = ParseMsgContent(input.Content)
 			}
 
 			vectors, err := client.TextEmbedding(ctx, texts, modelName)
@@ -55,8 +59,14 @@ func defineEmbedder(g *genkit.Genkit, client *Client, modelName string, versions
 	)
 }
 
-func defineFakeEmbedder(g *genkit.Genkit) {
-	genkit.DefineEmbedder(g, providerID, "fake-embed", &ai.EmbedderOptions{},
+func defineFakeEmbedder() ai.Embedder {
+	modelName := "fake-embed"
+	return ai.NewEmbedder(
+		core.NewName(providerID, modelName),
+		&ai.EmbedderOptions{
+			Label:      strings.ToTitle(modelName),
+			Dimensions: defaultVectorSize,
+		},
 		func(ctx context.Context, mr *ai.EmbedRequest) (*ai.EmbedResponse, error) {
 			if len(mr.Input) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
@@ -69,7 +79,7 @@ func defineFakeEmbedder(g *genkit.Genkit) {
 
 			texts := make([]string, len(mr.Input), len(mr.Input))
 			for i, input := range mr.Input {
-				texts[i] = parseMsgContent(input.Content)
+				texts[i] = ParseMsgContent(input.Content)
 			}
 
 			vecSize := cfg.VectorSize

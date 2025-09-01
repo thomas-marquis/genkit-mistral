@@ -1,7 +1,6 @@
-package mistral
+package mistralclient
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -45,7 +44,7 @@ func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	response, err := sendRequest(ctx, c.httpClient, http.MethodPost, url, bytes.NewBuffer(jsonValue), c.apiKey)
+	response, err := sendRequest(ctx, c, http.MethodPost, url, jsonValue)
 	if err != nil {
 		return nil, err
 	}
