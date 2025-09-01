@@ -1,10 +1,5 @@
 package mistralclient
 
-type modelInfo struct {
-	Name     string
-	Versions []string
-}
-
 type UsageResponse struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`

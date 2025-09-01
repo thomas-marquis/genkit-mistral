@@ -35,7 +35,7 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
 
-			texts := make([]string, len(mr.Input), len(mr.Input))
+			texts := make([]string, len(mr.Input))
 			for i, input := range mr.Input {
 				texts[i] = StringFromParts(input.Content)
 			}
@@ -45,7 +45,7 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 				return nil, fmt.Errorf("failed to get embedding: %w", err)
 			}
 
-			embeds := make([]*ai.Embedding, len(vectors), len(vectors))
+			embeds := make([]*ai.Embedding, len(vectors))
 			for i, vector := range vectors {
 				embeds[i] = &ai.Embedding{
 					Embedding: vector,
@@ -77,7 +77,7 @@ func defineFakeEmbedder() ai.Embedder {
 				return nil, err
 			}
 
-			texts := make([]string, len(mr.Input), len(mr.Input))
+			texts := make([]string, len(mr.Input))
 			for i, input := range mr.Input {
 				texts[i] = StringFromParts(input.Content)
 			}
@@ -87,8 +87,8 @@ func defineFakeEmbedder() ai.Embedder {
 				vecSize = defaultVectorSize
 			}
 
-			embeds := make([]*ai.Embedding, len(texts), len(texts))
-			for i, _ := range texts {
+			embeds := make([]*ai.Embedding, len(texts))
+			for i := range texts {
 				embeds[i] = &ai.Embedding{
 					Embedding: createFakeVector(vecSize),
 				}

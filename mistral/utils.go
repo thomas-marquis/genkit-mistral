@@ -54,7 +54,7 @@ func MapResponse(mr *ai.ModelRequest, resp string) *ai.ModelResponse {
 }
 
 func MapMessagesToGenkit(messages []mistralclient.Message) []*ai.Message {
-	m := make([]*ai.Message, len(messages), len(messages))
+	m := make([]*ai.Message, len(messages))
 	for i, msg := range messages {
 		m[i] = NewGenkitMessageFromMistral(msg)
 	}
@@ -62,7 +62,7 @@ func MapMessagesToGenkit(messages []mistralclient.Message) []*ai.Message {
 }
 
 func MapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
-	m := make([]mistralclient.Message, len(messages), len(messages))
+	m := make([]mistralclient.Message, len(messages))
 	for i, msg := range messages {
 		m[i] = NewMistralMessageFromGenkit(msg)
 	}

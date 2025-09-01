@@ -164,7 +164,9 @@ func sendRequest(ctx context.Context, c *Client, method, url string, body []byte
 			if attempt < c.retryMaxRetries {
 				if _, ok := c.retryStatusCodes[resp.StatusCode]; ok {
 					// Drain and close the body before retrying
-					io.Copy(io.Discard, resp.Body)
+					if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+						return nil, fmt.Errorf("failed to drain response body: %w", err)
+					}
 					resp.Body.Close()
 					wait := c.nextBackoff(attempt)
 					if c.verbose {

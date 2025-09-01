@@ -17,6 +17,7 @@ go get github.com/thomas-marquis/genkit-mistral
 
 See the full API and more examples in the Go reference: https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral
 
+Check the [Genkit's documentation](https://genkit.dev/go/docs/models/) for more insights.
 
 ### Basit text generation
 
@@ -138,6 +139,38 @@ func main() {
 
 ## Models and embeddings 🧠
 
+Supported chat/completions models (family name with versions/aliases):
+- mistral-medium (mistral-medium-2505, mistral-medium-2508, mistral-medium-latest)
+- mistral-large (mistral-large-2407, mistral-large-2411, mistral-large-latest)
+- mistral-small (mistral-small-2312, mistral-small-2409, mistral-small-2501, mistral-small-2503, mistral-small-2506, mistral-small-latest, open-mixtral-8x7b)
+- mistral-tiny (mistral-tiny-2312, mistral-tiny-2407, mistral-tiny-latest, open-mistral-7b, open-mistral-nemo, open-mistral-nemo-2407)
+- open-mixtral-8x22b (open-mixtral-8x22b, open-mixtral-8x22b-2404)
+- pixtral-large (pixtral-large-2411, pixtral-large-latest, mistral-large-pixtral-2411)
+- pixtral-12b (pixtral-12b-2409, pixtral-12b, pixtral-12b-latest)
+- codestral (codestral-2411-rc5, codestral-2412, codestral-2501, codestral-2508, codestral-latest)
+- devstral-small (devstral-small-2505, devstral-small-2507, devstral-small-latest)
+- devstral-medium (devstral-medium-2507, devstral-medium-latest)
+- magistral-medium (magistral-medium-2506, magistral-medium-2507, magistral-medium-latest)
+- magistral-small (magistral-small-2506, magistral-small-2507, magistral-small-latest)
+- mistral-saba (mistral-saba-2502, mistral-saba-latest)
+- voxtral-mini (voxtral-mini-2507, voxtral-mini-latest)
+- voxtral-small (voxtral-small-2507, voxtral-small-latest)
+- mistral-moderation (mistral-moderation-2411, mistral-moderation-latest)
+- mistral-ocr (mistral-ocr-2503, mistral-ocr-2505, mistral-ocr-latest)
+- voxtral-mini-transcribe (voxtral-mini-transcribe-2507)
+
+
+Supported embedders:
+- mistral-embed
+- codestral-embed
+
+You can find all tes mistral models with this command:
+
+```bash
+curl --request GET \
+  --url https://api.mistral.ai/v1/models \
+  --header 'Authorization: Bearer <your API token>'
+```
 
 
 ## Useful resources 📚
