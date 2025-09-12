@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type EmbeddingVector []float32
@@ -27,9 +28,18 @@ type EmbeddingResponse struct {
 		Embedding EmbeddingVector `json:"embedding"`
 		Index     int             `json:"index"`
 	} `json:"data"`
+	Latency time.Duration `json:"latency_ms,omitempty"`
 }
 
-func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string) ([]EmbeddingVector, error) {
+func (r *EmbeddingResponse) Embeddings() []EmbeddingVector {
+	vectors := make([]EmbeddingVector, len(r.Data))
+	for i, data := range r.Data {
+		vectors[i] = data.Embedding
+	}
+	return vectors
+}
+
+func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error) {
 	c.rateLimiter.Wait()
 
 	url := fmt.Sprintf("%s/v1/embeddings", c.baseURL)
@@ -44,7 +54,7 @@ func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	response, err := sendRequest(ctx, c, http.MethodPost, url, jsonValue)
+	response, lat, err := sendRequest(ctx, c, http.MethodPost, url, jsonValue)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +75,7 @@ func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string
 		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	vectors := make([]EmbeddingVector, len(resp.Data))
-	for i, data := range resp.Data {
-		vectors[i] = data.Embedding
-	}
+	resp.Latency = lat
 
-	return vectors, nil
+	return &resp, nil
 }

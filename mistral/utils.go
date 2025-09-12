@@ -1,8 +1,10 @@
 package mistral
 
 import (
+	"encoding/json"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/thomas-marquis/genkit-mistral/mistralclient"
@@ -27,49 +29,162 @@ func StringFromParts(content []*ai.Part) string {
 	return msg
 }
 
-func NewMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
-	return mistralclient.Message{
-		Role:    RoleFromGenkit(msg.Role),
-		Content: StringFromParts(msg.Content),
+// SanitizeToolName formats a function name to be used as a reference in a tool call.
+func SanitizeToolName(name string) string {
+	runes := []rune(name)
+
+	isAllowed := func(r rune) bool {
+		return (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' || r == '-'
 	}
+
+	var b strings.Builder
+	b.Grow(len(runes))
+
+	for i := 0; i < len(runes); {
+		r := runes[i]
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_':
+			b.WriteRune(r)
+			i++
+		case r == '-':
+			// If pattern is "-<disallowed>-" convert to "_-" (skip the middle disallowed runes)
+			j := i + 1
+			skipped := 0
+			for j < len(runes) && !isAllowed(runes[j]) {
+				j++
+				skipped++
+			}
+			if j < len(runes) && runes[j] == '-' && skipped > 0 {
+				b.WriteRune('_')
+				b.WriteRune('-')
+				i = j + 1
+			} else {
+				b.WriteRune('-')
+				i++
+			}
+		default:
+			// drop any other disallowed characters
+			i++
+		}
+	}
+
+	result := b.String()
+	if len(result) > 256 {
+		result = result[:256]
+	}
+	return result
 }
 
-func NewGenkitMessageFromMistral(msg mistralclient.Message) *ai.Message {
+func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
+	content := msg.Content
+
+	m := mistralclient.Message{
+		Role: mapRoleFromGenkit(msg.Role),
+	}
+
+	for _, part := range content {
+		switch part.Kind {
+		case ai.PartText:
+			m.Content += part.Text + "\n"
+		case ai.PartToolRequest:
+			m.ToolCalls = append(m.ToolCalls, mistralclient.NewToolCallRequest(
+				part.ToolRequest.Ref, 0, part.ToolRequest.Name, part.ToolRequest.Input,
+			))
+		case ai.PartToolResponse:
+			bytes, err := json.Marshal(part.ToolResponse.Output)
+			if err != nil {
+				logger.Printf("Failed to marshal tool response: %v\n", err)
+			} else {
+				m.Content += string(bytes) + "\n"
+			}
+			m.ToolCallId = part.ToolResponse.Ref
+			m.FunctionName = part.ToolResponse.Name
+		default:
+			logger.Printf("Unexpected message content part kind: %v\n", part)
+		}
+	}
+
+	return m
+}
+
+func newGenkitMessageFromMistral(msg mistralclient.Message) *ai.Message {
 	return &ai.Message{
 		Role:    ai.Role(msg.Role),
 		Content: []*ai.Part{ai.NewTextPart(msg.Content)},
 	}
 }
 
-func MapResponse(mr *ai.ModelRequest, resp string) *ai.ModelResponse {
-	aiMessage := &ai.Message{
-		Role:    ai.RoleModel,
-		Content: []*ai.Part{ai.NewTextPart(resp)},
+func mapResponse(mr *ai.ModelRequest, resp mistralclient.ChatCompletionResponse) *ai.ModelResponse {
+	var parts []*ai.Part
+
+	response := &ai.ModelResponse{
+		Request: mr,
+		Usage: &ai.GenerationUsage{
+			InputTokens:  resp.Usage.PromptTokens,
+			OutputTokens: resp.Usage.CompletionTokens,
+			TotalTokens:  resp.Usage.TotalTokens,
+		},
+		LatencyMs: float64(resp.Latency.Milliseconds()),
 	}
 
+	if len(resp.Choices) == 0 {
+		return response
+	}
+
+	c := resp.Choices[0]
+	if cnt := c.Message.Content; cnt != "" {
+		parts = append(parts, ai.NewTextPart(cnt))
+	}
+
+	if toolCalls := c.Message.ToolCalls; len(toolCalls) > 0 {
+		for _, tc := range toolCalls {
+			parts = append(parts, ai.NewToolRequestPart(&ai.ToolRequest{
+				Name:  tc.Function.Name,
+				Ref:   tc.ID,
+				Input: tc.Function.Arguments,
+			}))
+		}
+	}
+
+	response.Message = &ai.Message{
+		Role:    ai.RoleModel,
+		Content: parts,
+	}
+	response.FinishReason = ai.FinishReason(c.FinishReason)
+
+	return response
+}
+
+func mapResponseFromText(mr *ai.ModelRequest, resp string) *ai.ModelResponse {
 	return &ai.ModelResponse{
 		Request: mr,
-		Message: aiMessage,
+		Message: &ai.Message{
+			Role:    ai.RoleModel,
+			Content: []*ai.Part{ai.NewTextPart(resp)},
+		},
 	}
 }
 
-func MapMessagesToGenkit(messages []mistralclient.Message) []*ai.Message {
+func mapMessagesToGenkit(messages []mistralclient.Message) []*ai.Message {
 	m := make([]*ai.Message, len(messages))
 	for i, msg := range messages {
-		m[i] = NewGenkitMessageFromMistral(msg)
+		m[i] = newGenkitMessageFromMistral(msg)
 	}
 	return nil
 }
 
-func MapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
+func mapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
 	m := make([]mistralclient.Message, len(messages))
 	for i, msg := range messages {
-		m[i] = NewMistralMessageFromGenkit(msg)
+		m[i] = newMistralMessageFromGenkit(msg)
 	}
 	return m
 }
 
-func RoleFromGenkit(role ai.Role) string {
+func mapRoleFromGenkit(role ai.Role) string {
 	switch role {
 	case ai.RoleUser:
 		return mistralclient.RoleHuman
@@ -82,7 +197,7 @@ func RoleFromGenkit(role ai.Role) string {
 	}
 }
 
-func RoleFromMistral(role string) ai.Role {
+func mapRoleFromMistral(role string) ai.Role {
 	switch role {
 	case mistralclient.RoleHuman:
 		return ai.RoleUser

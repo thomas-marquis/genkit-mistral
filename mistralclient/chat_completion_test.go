@@ -165,7 +165,7 @@ func Test_ChatCompletion_ShouldNotRetryOn400AndFailsImmediately(t *testing.T) {
 	inputMsgs := []mistralclient.Message{mistralclient.NewHumanMessage("Hi!")}
 
 	// When
-	_, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
+	_, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
 
 	// Then
 	if err == nil {
@@ -200,7 +200,7 @@ func Test_ChatCompletion_ShouldRetryOnTimeoutErrorThenSucceeds(t *testing.T) {
 	inputMsgs := []mistralclient.Message{mistralclient.NewHumanMessage("Hello")}
 
 	// When
-	msg, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
+	msg, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
 
 	// Then
 	assert.NoError(t, err, "expected no error")

@@ -130,19 +130,21 @@ func (c *Client) nextBackoff(attempt int) time.Duration {
 	return jitter
 }
 
-func sendRequest(ctx context.Context, c *Client, method, url string, body []byte) (*http.Response, error) {
+func sendRequest(ctx context.Context, c *Client, method, url string, body []byte) (*http.Response, time.Duration, error) {
 	// attempt = 0 is the first try; we perform up to (1 + retryMaxRetries) attempts total.
 	for attempt := 0; attempt <= c.retryMaxRetries; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+			return nil, 0, fmt.Errorf("failed to create HTTP request: %w", err)
 		}
 
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		req.Header.Set("Accept", "application/json; charset=utf-8")
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+		t0 := time.Now()
 		resp, err := c.httpClient.Do(req)
+		latency := time.Since(t0)
 		if err != nil {
 			if attempt < c.retryMaxRetries && isRetryableErr(err) {
 				wait := c.nextBackoff(attempt)
@@ -154,10 +156,10 @@ func sendRequest(ctx context.Context, c *Client, method, url string, body []byte
 				case <-time.After(wait):
 					continue
 				case <-ctx.Done():
-					return nil, ctx.Err()
+					return nil, 0, ctx.Err()
 				}
 			}
-			return nil, fmt.Errorf("failed to make HTTP request: %w", err)
+			return nil, 0, fmt.Errorf("failed to make HTTP request: %w", err)
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -165,7 +167,7 @@ func sendRequest(ctx context.Context, c *Client, method, url string, body []byte
 				if _, ok := c.retryStatusCodes[resp.StatusCode]; ok {
 					// Drain and close the body before retrying
 					if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-						return nil, fmt.Errorf("failed to drain response body: %w", err)
+						return nil, 0, fmt.Errorf("failed to drain response body: %w", err)
 					}
 					resp.Body.Close()
 					wait := c.nextBackoff(attempt)
@@ -177,18 +179,18 @@ func sendRequest(ctx context.Context, c *Client, method, url string, body []byte
 					case <-time.After(wait):
 						continue
 					case <-ctx.Done():
-						return nil, ctx.Err()
+						return nil, 0, ctx.Err()
 					}
 				}
 			}
 			errResponseBody, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			return nil, fmt.Errorf("HTTP request failed with status %s and body '%s'",
+			return nil, 0, fmt.Errorf("HTTP request failed with status %s and body '%s'",
 				resp.Status, string(errResponseBody))
 		}
 
-		return resp, nil
+		return resp, latency, nil
 	}
 
-	return nil, fmt.Errorf("exhausted retries without a successful response")
+	return nil, 0, fmt.Errorf("exhausted retries without a successful response")
 }

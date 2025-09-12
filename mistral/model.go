@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/firebase/genkit/go/core"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/internal"
 	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 
@@ -20,7 +20,7 @@ const (
 
 func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
-		core.NewName(providerID, modelName),
+		api.NewName(providerID, modelName),
 		&ai.ModelOptions{
 			Label:    modelInfo.Label,
 			Stage:    modelInfo.Stage,
@@ -36,7 +36,7 @@ func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.
 			if len(mr.Messages) == 0 {
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
-			messages := MapMessagesToMistral(mr.Messages)
+			messages := mapMessagesToMistral(mr.Messages)
 
 			var formatOpt mistralclient.ChatCompletionOption
 			if mr.Output.Constrained && mr.Output.Format == "json" {
@@ -45,12 +45,33 @@ func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.
 				formatOpt = mistralclient.WithResponseTextFormat()
 			}
 
-			response, err := c.ChatCompletion(ctx, messages, modelName, cfg, formatOpt)
+			opts := []mistralclient.ChatCompletionOption{formatOpt}
+			if nbTools := len(mr.Tools); nbTools > 0 {
+				if tc := mistralclient.NewToolChoice(string(mr.ToolChoice)); tc != "" {
+					opts = append(opts, mistralclient.WithToolChoice(tc))
+				}
+
+				tools := make([]mistralclient.ToolDefinition, 0, nbTools)
+				for _, tool := range mr.Tools {
+					tools = append(tools, mistralclient.ToolDefinition{
+						Type: "function",
+						Function: mistralclient.ToolFunctionDefinition{
+							Name:        tool.Name,
+							Description: tool.Description,
+							Parameters:  tool.InputSchema,
+							Strict:      false,
+						},
+					})
+				}
+				opts = append(opts, mistralclient.WithTools(tools))
+			}
+
+			response, err := c.ChatCompletion(ctx, messages, modelName, cfg, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
 
-			return MapResponse(mr, response.Content), nil
+			return mapResponse(mr, response), nil
 		},
 	)
 }
@@ -83,7 +104,7 @@ func defineModel(c *mistralclient.Client, modelName string, modelInfos ai.ModelI
 func defineFakeModel() ai.Model {
 	modelName := "fake-completion"
 	return ai.NewModel(
-		core.NewName(providerID, modelName),
+		api.NewName(providerID, modelName),
 		&ai.ModelOptions{
 			Label: strings.ToTitle(modelName),
 			Supports: &ai.ModelSupports{
@@ -111,7 +132,7 @@ func defineFakeModel() ai.Model {
 				return nil, fmt.Errorf("failed to generate fake response: %w", err)
 			}
 
-			return MapResponse(mr, fakeResponse), nil
+			return mapResponseFromText(mr, fakeResponse), nil
 		},
 	)
 }

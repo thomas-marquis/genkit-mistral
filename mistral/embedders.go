@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/core"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/internal"
 	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
@@ -28,7 +28,7 @@ func newEmbeddingOptionsFromRaw(r map[string]any) *EmbeddingOptions {
 
 func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder {
 	return ai.NewEmbedder(
-		core.NewName(providerID, modelName),
+		api.NewName(providerID, modelName),
 		&ai.EmbedderOptions{},
 		func(ctx context.Context, mr *ai.EmbedRequest) (*ai.EmbedResponse, error) {
 			if len(mr.Input) == 0 {
@@ -40,16 +40,21 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 				texts[i] = StringFromParts(input.Content)
 			}
 
-			vectors, err := client.TextEmbedding(ctx, texts, modelName)
+			embResp, err := client.TextEmbedding(ctx, texts, modelName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get embedding: %w", err)
 			}
 
+			vectors := embResp.Embeddings()
 			embeds := make([]*ai.Embedding, len(vectors))
 			for i, vector := range vectors {
 				embeds[i] = &ai.Embedding{
 					Embedding: vector,
 				}
+			}
+
+			if len(embeds) == 0 {
+				return nil, fmt.Errorf("no embeddings returned by the model")
 			}
 
 			return &ai.EmbedResponse{
@@ -62,7 +67,7 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 func defineFakeEmbedder() ai.Embedder {
 	modelName := "fake-embed"
 	return ai.NewEmbedder(
-		core.NewName(providerID, modelName),
+		api.NewName(providerID, modelName),
 		&ai.EmbedderOptions{
 			Label:      strings.ToTitle(modelName),
 			Dimensions: defaultVectorSize,
