@@ -16,6 +16,10 @@ const (
 	defaultVectorSize = 1024
 )
 
+var (
+	ErrNoEmbeddings = fmt.Errorf("no embeddings returned by the model")
+)
+
 type EmbeddingOptions struct {
 	VectorSize int `json:"vectorSize,omitempty"`
 }
@@ -26,7 +30,7 @@ func newEmbeddingOptionsFromRaw(r map[string]any) *EmbeddingOptions {
 	}
 }
 
-func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder {
+func defineEmbedder(client mistralclient.Client, modelName string) ai.Embedder {
 	return ai.NewEmbedder(
 		api.NewName(providerID, modelName),
 		&ai.EmbedderOptions{},
@@ -54,7 +58,7 @@ func defineEmbedder(client *mistralclient.Client, modelName string) ai.Embedder 
 			}
 
 			if len(embeds) == 0 {
-				return nil, fmt.Errorf("no embeddings returned by the model")
+				return nil, ErrNoEmbeddings
 			}
 
 			return &ai.EmbedResponse{

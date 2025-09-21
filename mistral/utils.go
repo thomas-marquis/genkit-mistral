@@ -18,9 +18,12 @@ var (
 // The multiple parts are concatenated with a newline character.
 func StringFromParts(content []*ai.Part) string {
 	var msg string
-	for _, part := range content {
+	for i, part := range content {
 		if part.Kind == ai.PartText {
-			msg += part.Text + "\n"
+			msg += part.Text
+			if i < len(content)-1 {
+				msg += "\n"
+			}
 		} else {
 			logger.Printf("Unexpected message content part: %v\n", part)
 		}

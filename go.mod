@@ -7,6 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/firebase/genkit/go v1.0.2
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/mock v0.6.0
 )
 
 require (

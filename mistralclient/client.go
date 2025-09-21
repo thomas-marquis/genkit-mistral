@@ -17,7 +17,18 @@ const (
 	defaultTimeout    = 5 * time.Second
 )
 
-type Client struct {
+type Client interface {
+	TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error)
+	ChatCompletion(
+		ctx context.Context,
+		messages []Message,
+		model string,
+		cfg *ModelConfig,
+		opts ...ChatCompletionOption,
+	) (ChatCompletionResponse, error)
+}
+
+type clientImpl struct {
 	apiKey      string
 	baseURL     string
 	rateLimiter RateLimiter
@@ -30,12 +41,12 @@ type Client struct {
 	retryStatusCodes map[int]struct{}
 }
 
-func NewClient(apiKey string, opts ...Option) *Client {
+func NewClient(apiKey string, opts ...Option) Client {
 	return NewClientWithConfig(apiKey, NewConfig(opts...))
 }
 
-func NewClientWithConfig(apiKey string, cfg *Config) *Client {
-	c := &Client{
+func NewClientWithConfig(apiKey string, cfg *Config) Client {
+	c := &clientImpl{
 		apiKey:      apiKey,
 		baseURL:     mistralBaseAPIURL,
 		rateLimiter: NewNoneRateLimiter(),
@@ -117,7 +128,7 @@ func isRetryableErr(err error) bool {
 	return errors.Is(err, io.EOF)
 }
 
-func (c *Client) nextBackoff(attempt int) time.Duration {
+func (c *clientImpl) nextBackoff(attempt int) time.Duration {
 	if attempt <= 0 {
 		return c.retryWaitMin
 	}
@@ -130,7 +141,7 @@ func (c *Client) nextBackoff(attempt int) time.Duration {
 	return jitter
 }
 
-func sendRequest(ctx context.Context, c *Client, method, url string, body []byte) (*http.Response, time.Duration, error) {
+func sendRequest(ctx context.Context, c *clientImpl, method, url string, body []byte) (*http.Response, time.Duration, error) {
 	// attempt = 0 is the first try; we perform up to (1 + retryMaxRetries) attempts total.
 	for attempt := 0; attempt <= c.retryMaxRetries; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))

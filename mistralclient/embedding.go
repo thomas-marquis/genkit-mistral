@@ -18,17 +18,19 @@ type EmbeddingRequest struct {
 	OutputDtype     string   `json:"output_dtype,omitempty"`
 }
 
+type EmbeddingData struct {
+	Object    string          `json:"object"`
+	Embedding EmbeddingVector `json:"embedding"`
+	Index     int             `json:"index"`
+}
+
 type EmbeddingResponse struct {
-	ID     string        `json:"id"`
-	Object string        `json:"object"`
-	Model  string        `json:"model"`
-	Usage  UsageResponse `json:"usage"`
-	Data   []struct {
-		Object    string          `json:"object"`
-		Embedding EmbeddingVector `json:"embedding"`
-		Index     int             `json:"index"`
-	} `json:"data"`
-	Latency time.Duration `json:"latency_ms,omitempty"`
+	ID      string          `json:"id"`
+	Object  string          `json:"object"`
+	Model   string          `json:"model"`
+	Usage   UsageResponse   `json:"usage"`
+	Data    []EmbeddingData `json:"data"`
+	Latency time.Duration   `json:"latency_ms,omitempty"`
 }
 
 func (r *EmbeddingResponse) Embeddings() []EmbeddingVector {
@@ -39,7 +41,7 @@ func (r *EmbeddingResponse) Embeddings() []EmbeddingVector {
 	return vectors
 }
 
-func (c *Client) TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error) {
+func (c *clientImpl) TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error) {
 	c.rateLimiter.Wait()
 
 	url := fmt.Sprintf("%s/v1/embeddings", c.baseURL)

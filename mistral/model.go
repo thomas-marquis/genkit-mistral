@@ -18,7 +18,7 @@ const (
 	defaultFakeResponseSize = 25
 )
 
-func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
+func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
 		api.NewName(providerID, modelName),
 		&ai.ModelOptions{
@@ -76,7 +76,7 @@ func defineSingleModel(c *mistralclient.Client, modelName string, modelInfo *ai.
 	)
 }
 
-func defineModel(c *mistralclient.Client, modelName string, modelInfos ai.ModelInfo) []ai.Model {
+func defineModel(c mistralclient.Client, modelName string, modelInfos ai.ModelInfo) []ai.Model {
 	var defined []ai.Model
 
 	defined = append(defined, defineSingleModel(c, modelName, &modelInfos))

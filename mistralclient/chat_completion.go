@@ -116,7 +116,7 @@ func WithResponseJsonSchema(schema any) ChatCompletionOption {
 	}
 }
 
-func (c *Client) ChatCompletion(
+func (c *clientImpl) ChatCompletion(
 	ctx context.Context,
 	messages []Message,
 	model string,
