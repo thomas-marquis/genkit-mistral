@@ -5,8 +5,7 @@ import (
 	"sync"
 
 	"github.com/firebase/genkit/go/ai"
-	"github.com/firebase/genkit/go/core"
-	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
 
@@ -456,7 +455,7 @@ type Plugin struct {
 	sync.Mutex
 
 	APIKey string
-	Client *mistralclient.Client
+	Client mistralclient.Client
 
 	config *Config
 }
@@ -472,29 +471,30 @@ func (p *Plugin) Name() string {
 	return providerID
 }
 
-func (p *Plugin) Init(ctx context.Context) []core.Action {
-	c := mistralclient.NewClientWithConfig(p.APIKey, &p.config.Client)
-	p.Client = c
+func (p *Plugin) Init(ctx context.Context) []api.Action {
+	if p.Client == nil {
+		p.Client = mistralclient.NewClientWithConfig(p.APIKey, &p.config.Client)
+	}
 
 	p.Lock()
 	defer p.Unlock()
 
-	var actions []core.Action
+	var actions []api.Action
 
 	for name, info := range llmModels {
-		models := defineModel(c, name, info)
+		models := defineModel(p.Client, name, info)
 		for _, model := range models {
-			actions = append(actions, model.(core.Action))
+			actions = append(actions, model.(api.Action))
 		}
 	}
-	actions = append(actions, defineFakeModel().(core.Action))
+	actions = append(actions, defineFakeModel().(api.Action))
 
 	for _, name := range embeddingModels {
-		actions = append(actions, defineEmbedder(c, name).(core.Action))
+		actions = append(actions, defineEmbedder(p.Client, name).(api.Action))
 	}
-	actions = append(actions, defineFakeEmbedder().(core.Action))
+	actions = append(actions, defineFakeEmbedder().(api.Action))
 
 	return actions
 }
 
-var _ genkit.Plugin = &Plugin{}
+var _ api.Plugin = &Plugin{}

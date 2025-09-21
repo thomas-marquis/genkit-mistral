@@ -84,9 +84,9 @@ func Test_ChatCompletion_ShouldReturnMessageWhenSucceed(t *testing.T) {
 		res, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
 
 		// Then
-		expected := mistralclient.NewAssistantMessage("Hello, how can I assist you?")
 		assert.NoError(t, err)
-		assert.Equal(t, expected, res)
+		assert.Len(t, res.Choices, 1)
+		assert.Equal(t, mistralclient.NewAssistantMessage("Hello, how can I assist you?"), res.Choices[0].Message.Message)
 	})
 }
 
@@ -130,12 +130,12 @@ func Test_ChatCompletion_ShouldRetryOn5xxThenSucceeds(t *testing.T) {
 	}
 
 	// When
-	msg, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
+	res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
 
 	// Then
 	assert.NoError(t, err, "expected no error")
-	expected := mistralclient.NewAssistantMessage("Hello after retries")
-	assert.Equal(t, expected, msg, "expected message")
+	assert.Len(t, res.Choices, 1, "expected 1 choice")
+	assert.Equal(t, mistralclient.NewAssistantMessage("Hello after retries"), res.Choices[0].Message.Message, "expected message")
 	assert.Equal(t, int32(3), atomic.LoadInt32(&attempts), "expected 3 attempts")
 }
 
@@ -165,7 +165,7 @@ func Test_ChatCompletion_ShouldNotRetryOn400AndFailsImmediately(t *testing.T) {
 	inputMsgs := []mistralclient.Message{mistralclient.NewHumanMessage("Hi!")}
 
 	// When
-	_, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
+	_, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
 
 	// Then
 	if err == nil {
@@ -200,12 +200,12 @@ func Test_ChatCompletion_ShouldRetryOnTimeoutErrorThenSucceeds(t *testing.T) {
 	inputMsgs := []mistralclient.Message{mistralclient.NewHumanMessage("Hello")}
 
 	// When
-	msg, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
+	res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
 
 	// Then
 	assert.NoError(t, err, "expected no error")
-	expected := mistralclient.NewAssistantMessage("OK after timeout")
-	assert.Equal(t, expected, msg, "expected message content")
+	assert.Len(t, res.Choices, 1, "expected 1 choice")
+	assert.Equal(t, mistralclient.NewAssistantMessage("OK after timeout"), res.Choices[0].Message.Message, "expected message content")
 }
 
 func Test_ChatCompletion_ShouldFailWhenMaxRetriesReached(t *testing.T) {
