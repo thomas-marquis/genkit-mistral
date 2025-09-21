@@ -50,10 +50,6 @@ jobs:
           go test ./... -race -covermode=atomic -coverprofile=coverage/coverage.out
           go tool cover -func=coverage/coverage.out | tee coverage/summary.txt
 
-      - name: Build (sanity)
-        run: |
-          go build ./...
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
