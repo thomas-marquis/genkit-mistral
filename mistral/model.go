@@ -18,6 +18,10 @@ const (
 	defaultFakeResponseSize = 25
 )
 
+var (
+	ErrInvalidModelInput = fmt.Errorf("invalid model input")
+)
+
 func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
 		api.NewName(providerID, modelName),
@@ -34,7 +38,7 @@ func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.M
 			}
 
 			if len(mr.Messages) == 0 {
-				return nil, fmt.Errorf("no messages provided in the model request")
+				return nil, fmt.Errorf("%w: no messages provided in the model request", ErrInvalidModelInput)
 			}
 			messages := mapMessagesToMistral(mr.Messages)
 

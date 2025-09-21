@@ -88,10 +88,13 @@ func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
 		Role: mapRoleFromGenkit(msg.Role),
 	}
 
-	for _, part := range content {
+	for i, part := range content {
 		switch part.Kind {
 		case ai.PartText:
-			m.Content += part.Text + "\n"
+			m.Content += part.Text
+			if i < len(content)-1 {
+				m.Content += "\n"
+			}
 		case ai.PartToolRequest:
 			m.ToolCalls = append(m.ToolCalls, mistralclient.NewToolCallRequest(
 				part.ToolRequest.Ref, 0, part.ToolRequest.Name, part.ToolRequest.Input,

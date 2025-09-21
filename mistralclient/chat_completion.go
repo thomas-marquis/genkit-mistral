@@ -29,18 +29,20 @@ type MessageResponse struct {
 	ToolCalls []ToolCallRequest `json:"tool_calls,omitempty"`
 }
 
+type ChatCompletionChoice struct {
+	Index        int             `json:"index"`
+	Message      MessageResponse `json:"message"`
+	FinishReason string          `json:"finish_reason"`
+}
+
 type ChatCompletionResponse struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	Model   string `json:"model"`
-	Choices []struct {
-		Index        int             `json:"index"`
-		Message      MessageResponse `json:"message"`
-		FinishReason string          `json:"finish_reason"`
-	} `json:"choices"`
-	Usage   UsageResponse `json:"usage"`
-	Latency time.Duration `json:"latency_ms,omitempty"`
+	ID      string                 `json:"id"`
+	Object  string                 `json:"object"`
+	Created int64                  `json:"created"`
+	Model   string                 `json:"model"`
+	Choices []ChatCompletionChoice `json:"choices"`
+	Usage   UsageResponse          `json:"usage"`
+	Latency time.Duration          `json:"latency_ms,omitempty"`
 }
 
 type chatCompletionOptions struct {

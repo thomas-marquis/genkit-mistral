@@ -18,7 +18,7 @@ var (
 	ctxType = reflect.TypeOf((*context.Context)(nil)).Elem()
 )
 
-func Test_Embedder_ShouldReturnAnSingleVector(t *testing.T) {
+func Test_Embed_ShouldReturnAnSingleVector(t *testing.T) {
 	// Given
 	ctrl := gomock.NewController(t)
 	mockClient := mocks.NewMockClient(ctrl)
@@ -56,7 +56,7 @@ func Test_Embedder_ShouldReturnAnSingleVector(t *testing.T) {
 	assert.Equal(t, res.Embeddings[0].Embedding, expectedVec)
 }
 
-func Test_Embedder_ShouldReturnMultipleVectors(t *testing.T) {
+func Test_Embed_ShouldReturnMultipleVectors(t *testing.T) {
 	// Given
 	ctrl := gomock.NewController(t)
 	mockClient := mocks.NewMockClient(ctrl)
@@ -106,7 +106,7 @@ func Test_Embedder_ShouldReturnMultipleVectors(t *testing.T) {
 	assert.Equal(t, res.Embeddings[1].Embedding, expectedVec2)
 }
 
-func Test_Embedder_ShouldReturnErrorWhenNoVectorIsReturned(t *testing.T) {
+func Test_Embed_ShouldReturnErrorWhenNoVectorIsReturned(t *testing.T) {
 	// Given
 	ctrl := gomock.NewController(t)
 	mockClient := mocks.NewMockClient(ctrl)
@@ -138,7 +138,7 @@ func Test_Embedder_ShouldReturnErrorWhenNoVectorIsReturned(t *testing.T) {
 	assert.Equal(t, mistral.ErrNoEmbeddings, err)
 }
 
-func Test_Embedder_ShouldReturnFakeVectorFromFakeModel(t *testing.T) {
+func Test_Embed_ShouldReturnFakeVectorFromFakeModel(t *testing.T) {
 	// Given
 	ctrl := gomock.NewController(t)
 	mockClient := mocks.NewMockClient(ctrl)
