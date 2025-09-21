@@ -77,9 +77,6 @@ type ToolCallRequest struct {
 
 func NewToolCallRequest(id string, index int, funcName string, args any) ToolCallRequest {
 	var a jsonMap
-	if args == nil {
-		a = jsonMap{}
-	}
 	if c, ok := args.(jsonMap); !ok {
 		a = jsonMap{"input": args}
 	} else {
