@@ -86,10 +86,6 @@ func NewToolCallRequest(id string, index int, funcName string, args any) ToolCal
 		a = c
 	}
 
-	if a == nil {
-		a = jsonMap{}
-	}
-
 	return ToolCallRequest{
 		ID:       id,
 		Index:    index,

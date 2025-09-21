@@ -116,13 +116,6 @@ func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
 	return m
 }
 
-func newGenkitMessageFromMistral(msg mistralclient.Message) *ai.Message {
-	return &ai.Message{
-		Role:    ai.Role(msg.Role),
-		Content: []*ai.Part{ai.NewTextPart(msg.Content)},
-	}
-}
-
 func mapResponse(mr *ai.ModelRequest, resp mistralclient.ChatCompletionResponse) *ai.ModelResponse {
 	var parts []*ai.Part
 
@@ -174,14 +167,6 @@ func mapResponseFromText(mr *ai.ModelRequest, resp string) *ai.ModelResponse {
 	}
 }
 
-func mapMessagesToGenkit(messages []mistralclient.Message) []*ai.Message {
-	m := make([]*ai.Message, len(messages))
-	for i, msg := range messages {
-		m[i] = newGenkitMessageFromMistral(msg)
-	}
-	return nil
-}
-
 func mapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
 	m := make([]mistralclient.Message, len(messages))
 	for i, msg := range messages {
@@ -200,18 +185,5 @@ func mapRoleFromGenkit(role ai.Role) string {
 		return mistralclient.RoleSystem
 	default:
 		return string(role) // Fallback to the string representation of the role
-	}
-}
-
-func mapRoleFromMistral(role string) ai.Role {
-	switch role {
-	case mistralclient.RoleHuman:
-		return ai.RoleUser
-	case mistralclient.RoleAssistant:
-		return ai.RoleModel
-	case mistralclient.RoleSystem:
-		return ai.RoleSystem
-	default:
-		return ai.RoleUser
 	}
 }
