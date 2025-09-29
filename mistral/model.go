@@ -62,7 +62,7 @@ func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.M
 						Function: mistralclient.ToolFunctionDefinition{
 							Name:        tool.Name,
 							Description: tool.Description,
-							Parameters:  tool.InputSchema,
+							Parameters:  mistralclient.MapFunctionParameters(tool.InputSchema),
 							Strict:      false,
 						},
 					})
