@@ -6,7 +6,7 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
+	mistralclient "github.com/gage-technologies/mistral-go"
 )
 
 const providerID = "mistral"
@@ -455,7 +455,7 @@ type Plugin struct {
 	sync.Mutex
 
 	APIKey string
-	Client mistralclient.Client
+	Client *mistralclient.MistralClient
 
 	config *Config
 }
@@ -473,7 +473,7 @@ func (p *Plugin) Name() string {
 
 func (p *Plugin) Init(ctx context.Context) []api.Action {
 	if p.Client == nil {
-		p.Client = mistralclient.NewClientWithConfig(p.APIKey, &p.config.Client)
+		p.Client = mistralclient.NewMistralClientDefault(p.APIKey)
 	}
 
 	p.Lock()

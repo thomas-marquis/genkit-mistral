@@ -2,6 +2,55 @@ package mistralclient
 
 import "fmt"
 
+type ChatMessage interface {
+	Type() Role
+}
+
+type SystemMessage struct {
+	Role    Role    `json:"role"`
+	Content Content `json:"content"`
+}
+
+var _ ChatMessage = (*SystemMessage)(nil)
+
+func NewSystemMessage(content Content) *SystemMessage {
+	m := &SystemMessage{
+		Role:    RoleSystem,
+		Content: content,
+	}
+	return m
+}
+
+func (m *SystemMessage) Type() Role {
+	return RoleSystem
+}
+
+type UserMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+func (m *UserMessage) Type() Role {
+	return RoleUser
+}
+
+type AssistantMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+	Prefix  bool   `json:"prefix,omitempty"`
+}
+
+func NewAssistantMessage(content string) *AssistantMessage {
+	return &AssistantMessage{
+		Role:    RoleAssistant.String(),
+		Content: content,
+	}
+}
+
+func (m *AssistantMessage) Type() Role {
+	return RoleAssistant
+}
+
 // Message is a Mistral chat message representation
 type Message struct {
 	Role         string            `json:"role"`
@@ -11,44 +60,44 @@ type Message struct {
 	FunctionName string            `json:"name,omitempty"`
 }
 
-const (
-	RoleHuman     = "user"
-	RoleAssistant = "assistant"
-	RoleSystem    = "system"
-)
+//func NewUserMessage(content string) Message {
+//	return Message{
+//		Role:    RoleUser,
+//		Content: content,
+//	}
+//}
+//
+//func NewAssistantMessage(content string) Message {
+//	return Message{
+//		Role:    RoleAssistant,
+//		Content: content,
+//	}
+//}
+//
+//func NewSystemMessage(content string) Message {
+//	return Message{
+//		Role:    RoleSystem,
+//		Content: content,
+//	}
+//}
+//
+//func NewToolMessage(content string, toolCallId string) Message {
+//	return Message{
+//		Role: RoleTool,
+//	}
+//}
 
-func NewHumanMessage(content string) Message {
-	return Message{
-		Role:    RoleHuman,
-		Content: content,
-	}
-}
+//func (m Message) IsHuman() bool {
+//	return m.Role == RoleUser
+//}
 
-func NewAssistantMessage(content string) Message {
-	return Message{
-		Role:    RoleAssistant,
-		Content: content,
-	}
-}
-
-func NewSystemMessage(content string) Message {
-	return Message{
-		Role:    RoleSystem,
-		Content: content,
-	}
-}
-
-func (m Message) IsHuman() bool {
-	return m.Role == RoleHuman
-}
-
-func (m Message) IsAssistant() bool {
-	return m.Role == RoleAssistant
-}
-
-func (m Message) IsSystem() bool {
-	return m.Role == RoleSystem
-}
+//func (m Message) IsAssistant() bool {
+//	return m.Role == RoleAssistant
+//}
+//
+//func (m Message) IsSystem() bool {
+//	return m.Role == RoleSystem
+//}
 
 type PropertyDefinition struct {
 	AdditionalProperties bool                          `json:"additionalProperties,omitempty"`

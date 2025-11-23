@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/firebase/genkit/go/core/api"
+	mistralclient "github.com/gage-technologies/mistral-go"
 	"github.com/thomas-marquis/genkit-mistral/internal"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 
 	"github.com/firebase/genkit/go/ai"
 )
@@ -22,7 +22,7 @@ var (
 	ErrInvalidModelInput = fmt.Errorf("invalid model input")
 )
 
-func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
+func defineSingleModel(c *mistralclient.MistralClient, modelName string, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
 		api.NewName(providerID, modelName),
 		&ai.ModelOptions{
@@ -70,7 +70,7 @@ func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.M
 				opts = append(opts, mistralclient.WithTools(tools))
 			}
 
-			response, err := c.ChatCompletion(ctx, messages, modelName, cfg, opts...)
+			response, err := c.Chat(modelName, messages)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}

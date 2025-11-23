@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/firebase/genkit/go/ai"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
+	mistralclient "github.com/gage-technologies/mistral-go"
 )
 
 var (
@@ -81,10 +81,10 @@ func SanitizeToolName(name string) string {
 	return result
 }
 
-func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
+func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.ChatMessage {
 	content := msg.Content
 
-	m := mistralclient.Message{
+	m := mistralclient.ChatMessage{
 		Role: mapRoleFromGenkit(msg.Role),
 	}
 
@@ -96,9 +96,18 @@ func newMistralMessageFromGenkit(msg *ai.Message) mistralclient.Message {
 				m.Content += "\n"
 			}
 		case ai.PartToolRequest:
-			m.ToolCalls = append(m.ToolCalls, mistralclient.NewToolCallRequest(
-				part.ToolRequest.Ref, 0, part.ToolRequest.Name, part.ToolRequest.Input,
-			))
+			funcArgs, err := json.Marshal(part.ToolRequest.Input)
+			if err != nil {
+				logger.Printf("Failed to marshal tool request: %v\n", err)
+			}
+			m.ToolCalls = append(m.ToolCalls, mistralclient.ToolCall{
+				Id:   part.ToolRequest.Ref,
+				Type: mistralclient.ToolTypeFunction,
+				Function: mistralclient.FunctionCall{
+					Name:      part.ToolRequest.Name,
+					Arguments: string(funcArgs),
+				},
+			})
 		case ai.PartToolResponse:
 			bytes, err := json.Marshal(part.ToolResponse.Output)
 			if err != nil {
@@ -167,8 +176,8 @@ func mapResponseFromText(mr *ai.ModelRequest, resp string) *ai.ModelResponse {
 	}
 }
 
-func mapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
-	m := make([]mistralclient.Message, len(messages))
+func mapMessagesToMistral(messages []*ai.Message) []mistralclient.ChatMessage {
+	m := make([]mistralclient.ChatMessage, len(messages))
 	for i, msg := range messages {
 		m[i] = newMistralMessageFromGenkit(msg)
 	}
@@ -178,7 +187,7 @@ func mapMessagesToMistral(messages []*ai.Message) []mistralclient.Message {
 func mapRoleFromGenkit(role ai.Role) string {
 	switch role {
 	case ai.RoleUser:
-		return mistralclient.RoleHuman
+		return mistralclient.RoleUser
 	case ai.RoleModel:
 		return mistralclient.RoleAssistant
 	case ai.RoleSystem:

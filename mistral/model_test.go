@@ -20,7 +20,7 @@ func Test_Generate_ShouldReturnGeneratedText(t *testing.T) {
 
 	messages := []mistralclient.Message{
 		mistralclient.NewSystemMessage("You are a helpful assistant."),
-		mistralclient.NewHumanMessage("Hello!"),
+		mistralclient.NewUserMessage("Hello!"),
 	}
 
 	mockClient.EXPECT().
@@ -76,7 +76,7 @@ Use the following information to complete your task:
 			gomock.AssignableToTypeOf(ctxType),
 			gomock.Eq([]mistralclient.Message{
 				mistralclient.NewSystemMessage("You are a helpful assistant."),
-				mistralclient.NewHumanMessage(expectedUserMsg),
+				mistralclient.NewUserMessage(expectedUserMsg),
 			}),
 			gomock.Eq("mistral-small-latest"),
 			gomock.Any(),
