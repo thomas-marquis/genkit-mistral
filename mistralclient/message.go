@@ -148,34 +148,46 @@ func (m *AssistantMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Message is a Mistral chat message representation
-type Message struct {
-	Role         string     `json:"role"`
-	Content      string     `json:"content"`
-	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallId   string     `json:"tool_call_id,omitempty"`
-	FunctionName string     `json:"name,omitempty"`
+type ToolMessage struct {
+	Role       Role    `json:"role"`
+	Content    Content `json:"content"`
+	Name       string  `json:"name"`
+	ToolCallId string  `json:"tool_call_id"`
 }
 
-//func NewUserMessage(content string) Message {
-//	return Message{
-//		Role:    RoleUser,
-//		ContentChunk: content,
-//	}
-//}
-//
-//func NewSystemMessage(content string) Message {
-//	return Message{
-//		Role:    RoleSystem,
-//		ContentChunk: content,
-//	}
-//}
-//
-//func NewToolMessage(content string, toolCallId string) Message {
-//	return Message{
-//		Role: RoleTool,
-//	}
-//}
+var _ ChatMessage = (*ToolMessage)(nil)
+var _ json.Unmarshaler = (*ToolMessage)(nil)
+
+func NewToolMessage(name string, toolCallId string, content Content) *ToolMessage {
+	return &ToolMessage{
+		Role:       RoleTool,
+		Content:    content,
+		Name:       name,
+		ToolCallId: toolCallId,
+	}
+}
+
+func (m *ToolMessage) Type() Role {
+	return RoleTool
+}
+
+func (m *ToolMessage) UnmarshalJSON(data []byte) error {
+	var res map[string]any
+	var err error
+	if err = json.Unmarshal(data, &res); err != nil {
+		return err
+	}
+	m.Content, err = unmarshalMessageContent(res)
+	if err != nil {
+		return err
+	}
+
+	m.Role = Role(res["role"].(string))
+	m.Name = res["name"].(string)
+	m.ToolCallId = res["tool_call_id"].(string)
+
+	return nil
+}
 
 func unmarshalMessageContent(raw map[string]any) (Content, error) {
 	var ct Content

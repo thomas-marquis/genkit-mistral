@@ -109,3 +109,7 @@ func NewToolCall(id string, index int, funcName string, args any) ToolCall {
 		Type:     "function",
 	}
 }
+
+type ToolChoice struct {
+	Name string `json:"name"`
+}

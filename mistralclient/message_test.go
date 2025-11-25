@@ -257,3 +257,55 @@ func TestAssistantMessage(t *testing.T) {
 		assert.Equal(t, `{"role":"assistant","content":"coucou","tool_calls":[{"id":"123","index":0,"function":{"name":"testFunction","arguments":{"input":{"name":"toto"}}},"type":"function"}]}`, string(j))
 	})
 }
+
+func TestToolMessage(t *testing.T) {
+	t.Run("should be unmarshaled from json", func(t *testing.T) {
+		j := `{
+			"role": "tool",
+			"content": [
+				{"type": "text", "text": "hello"},
+				{"image_url": "https://example.com/image.png", "type": "image_url"},
+				{"document_name": "document.pdf", "document_url": "https://example.com/document.pdf", "type": "document_url"},
+				{"reference_ids": [1, 2, 3, 5, 8], "type": "reference"},
+				{"file_id": "1234567890", "type": "file"},
+				{"type": "thinking", "thinking": [{"type": "text", "text": "world"}]},
+				{"input_audio": "https://example.com/audio.mp3", "type": "input_audio"}
+			],
+			"name": "testFunction",
+			"tool_call_id": "azerty"
+		}`
+		var tm mistralclient.ToolMessage
+
+		assert.NoError(t, json.Unmarshal([]byte(j), &tm))
+		assert.Equal(t, mistralclient.RoleTool, tm.Role)
+		assert.Equal(t, mistralclient.RoleTool, tm.Type())
+
+		assert.Equal(t, "testFunction", tm.Name)
+		assert.Equal(t, "azerty", tm.ToolCallId)
+
+		assert.Len(t, tm.Content.Chunks(), 7)
+		assert.Equal(t, "hello", tm.Content.Chunks()[0].(*mistralclient.TextContent).Text)
+		assert.Equal(t, "https://example.com/image.png", tm.Content.Chunks()[1].(*mistralclient.ImageUrlContent).ImageURL)
+		assert.Equal(t, "document.pdf", tm.Content.Chunks()[2].(*mistralclient.DocumentUrlContent).DocumentName)
+		assert.Equal(t, "https://example.com/document.pdf", tm.Content.Chunks()[2].(*mistralclient.DocumentUrlContent).DocumentURL)
+		assert.Equal(t, []int{1, 2, 3, 5, 8}, tm.Content.Chunks()[3].(*mistralclient.ReferenceContent).ReferenceIds)
+		assert.Equal(t, "1234567890", tm.Content.Chunks()[4].(*mistralclient.FileContent).FileId)
+		assert.Equal(t, "world", tm.Content.Chunks()[5].(*mistralclient.ThinkContent).Thinking[0].(*mistralclient.TextContent).Text)
+		assert.Equal(t, "https://example.com/audio.mp3", tm.Content.Chunks()[6].(*mistralclient.AudioContent).InputAudio)
+	})
+
+	t.Run("should be marshaled to json", func(t *testing.T) {
+		tm := mistralclient.NewToolMessage(
+			"testFunction",
+			"azerty",
+			mistralclient.ContentChunks{
+				mistralclient.NewTextContent("hello"),
+				mistralclient.NewThinkContent(mistralclient.NewTextContent("world")),
+			},
+		)
+		j, err := json.Marshal(tm)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"role":"tool","content":[{"type":"text","text":"hello"},{"type":"thinking","closed":true,"thinking":[{"type":"text","text":"world"}]}],"name":"testFunction","tool_call_id":"azerty"}`, string(j))
+	})
+}
