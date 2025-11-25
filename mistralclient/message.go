@@ -1,6 +1,9 @@
 package mistralclient
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type ChatMessage interface {
 	Type() Role
@@ -12,6 +15,7 @@ type SystemMessage struct {
 }
 
 var _ ChatMessage = (*SystemMessage)(nil)
+var _ json.Unmarshaler = (*SystemMessage)(nil)
 
 func NewSystemMessage(content Content) *SystemMessage {
 	m := &SystemMessage{
@@ -25,25 +29,92 @@ func (m *SystemMessage) Type() Role {
 	return RoleSystem
 }
 
+func (m *SystemMessage) UnmarshalJSON(data []byte) error {
+	var res map[string]any
+	if err := json.Unmarshal(data, &res); err != nil {
+		return err
+	}
+
+	m.Role = Role(res["role"].(string))
+
+	if stringContent, ok := res["content"].(string); ok {
+		m.Content = ContentString(stringContent)
+	} else if listContent, ok := res["content"].([]any); ok {
+		cts := ContentChunks{}
+		for _, chunk := range listContent {
+			t := chunk.(map[string]any)
+
+			switch t["type"].(string) {
+			case ContentTypeText.String():
+				cts = append(cts, NewTextContent(t["text"].(string)))
+
+			case ContentTypeThink.String():
+				var tc ThinkContent
+				if err := mapToStruct(t, &tc); err != nil {
+					return err
+				}
+				cts = append(cts, &tc)
+			}
+		}
+
+		m.Content = cts
+	} else {
+		return fmt.Errorf("invalid content type: %T", res["content"])
+	}
+
+	return nil
+}
+
 type UserMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    Role    `json:"role"`
+	Content Content `json:"content"`
+}
+
+var _ ChatMessage = (*UserMessage)(nil)
+var _ json.Unmarshaler = (*UserMessage)(nil)
+
+func NewUserMessage(content Content) *UserMessage {
+	return &UserMessage{
+		Role:    RoleUser,
+		Content: content,
+	}
 }
 
 func (m *UserMessage) Type() Role {
 	return RoleUser
 }
 
-type AssistantMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-	Prefix  bool   `json:"prefix,omitempty"`
+func (m *UserMessage) UnmarshalJSON(data []byte) error {
+	var res map[string]any
+	var err error
+	if err = json.Unmarshal(data, &res); err != nil {
+		return err
+	}
+	m.Content, err = unmarshalMessageContent(res)
+	if err != nil {
+		return err
+	}
+
+	m.Role = Role(res["role"].(string))
+
+	return nil
 }
 
-func NewAssistantMessage(content string) *AssistantMessage {
+type AssistantMessage struct {
+	Role      Role       `json:"role"`
+	Content   Content    `json:"content"`
+	Prefix    bool       `json:"prefix,omitempty"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+}
+
+var _ ChatMessage = (*AssistantMessage)(nil)
+var _ json.Unmarshaler = (*AssistantMessage)(nil)
+
+func NewAssistantMessage(content Content, toolCalls ...ToolCall) *AssistantMessage {
 	return &AssistantMessage{
-		Role:    RoleAssistant.String(),
-		Content: content,
+		Role:      RoleAssistant,
+		Content:   content,
+		ToolCalls: toolCalls,
 	}
 }
 
@@ -51,33 +122,52 @@ func (m *AssistantMessage) Type() Role {
 	return RoleAssistant
 }
 
+func (m *AssistantMessage) UnmarshalJSON(data []byte) error {
+	var res map[string]any
+	var err error
+	if err = json.Unmarshal(data, &res); err != nil {
+		return err
+	}
+	m.Content, err = unmarshalMessageContent(res)
+	if err != nil {
+		return err
+	}
+
+	m.Role = Role(res["role"].(string))
+
+	if tcs, ok := res["tool_calls"]; ok {
+		m.ToolCalls = make([]ToolCall, len(tcs.([]any)))
+		for i, tc := range tcs.([]any) {
+			m.ToolCalls[i] = ToolCall{}
+			if err := mapToStruct(tc.(map[string]any), &m.ToolCalls[i]); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Message is a Mistral chat message representation
 type Message struct {
-	Role         string            `json:"role"`
-	Content      string            `json:"content"`
-	ToolCalls    []ToolCallRequest `json:"tool_calls,omitempty"`
-	ToolCallId   string            `json:"tool_call_id,omitempty"`
-	FunctionName string            `json:"name,omitempty"`
+	Role         string     `json:"role"`
+	Content      string     `json:"content"`
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallId   string     `json:"tool_call_id,omitempty"`
+	FunctionName string     `json:"name,omitempty"`
 }
 
 //func NewUserMessage(content string) Message {
 //	return Message{
 //		Role:    RoleUser,
-//		Content: content,
-//	}
-//}
-//
-//func NewAssistantMessage(content string) Message {
-//	return Message{
-//		Role:    RoleAssistant,
-//		Content: content,
+//		ContentChunk: content,
 //	}
 //}
 //
 //func NewSystemMessage(content string) Message {
 //	return Message{
 //		Role:    RoleSystem,
-//		Content: content,
+//		ContentChunk: content,
 //	}
 //}
 //
@@ -87,118 +177,47 @@ type Message struct {
 //	}
 //}
 
-//func (m Message) IsHuman() bool {
-//	return m.Role == RoleUser
-//}
+func unmarshalMessageContent(raw map[string]any) (Content, error) {
+	var ct Content
 
-//func (m Message) IsAssistant() bool {
-//	return m.Role == RoleAssistant
-//}
-//
-//func (m Message) IsSystem() bool {
-//	return m.Role == RoleSystem
-//}
-
-type PropertyDefinition struct {
-	AdditionalProperties bool                          `json:"additionalProperties,omitempty"`
-	Description          string                        `json:"description"`
-	Type                 string                        `json:"type"`
-	Properties           map[string]PropertyDefinition `json:"properties,omitempty"`
-	Default              any                           `json:"default,omitempty"`
-}
-
-func MapFunctionParameters(parameters map[string]any) PropertyDefinition {
-	pd := PropertyDefinition{}
-
-	if parameters == nil {
-		return pd
+	rawContent, exists := raw["content"]
+	if !exists || rawContent == nil {
+		return nil, nil
 	}
 
-	// Map top-level fields
-	if v, ok := parameters["description"].(string); ok {
-		pd.Description = v
-	}
-	if v, ok := parameters["type"].(string); ok {
-		pd.Type = v
-	}
-	if v, ok := parameters["additionalProperties"].(bool); ok {
-		pd.AdditionalProperties = v
-	}
-	if v, ok := parameters["default"]; ok {
-		pd.Default = v
-	}
+	if stringContent, ok := rawContent.(string); ok {
+		ct = ContentString(stringContent)
+	} else if listContent, ok := rawContent.([]any); ok {
+		cts := ContentChunks{}
+		for _, chunk := range listContent {
+			t := chunk.(map[string]any)
+			var ptr ContentChunk
 
-	// Recursively map properties if present
-	if props, ok := parameters["properties"].(map[string]any); ok {
-		mapped := make(map[string]PropertyDefinition, len(props))
-		for k, raw := range props {
-			if m, ok := raw.(map[string]any); ok {
-				mapped[k] = MapFunctionParameters(m)
-			} else {
-				// If not a map, attempt to coerce simple type definitions
-				mapped[k] = PropertyDefinition{Type: toString(raw)}
+			switch t["type"].(string) {
+			case ContentTypeText.String():
+				ptr = &TextContent{}
+			case ContentTypeImageURL.String():
+				ptr = &ImageUrlContent{}
+			case ContentTypeDocumentURL.String():
+				ptr = &DocumentUrlContent{}
+			case ContentTypeReference.String():
+				ptr = &ReferenceContent{}
+			case ContentTypeFile.String():
+				ptr = &FileContent{}
+			case ContentTypeThink.String():
+				ptr = &ThinkContent{}
+			case ContentTypeAudio.String():
+				ptr = &AudioContent{}
 			}
+			if err := mapToStruct(t, ptr); err != nil {
+				return nil, err
+			}
+			cts = append(cts, ptr)
 		}
-		pd.Properties = mapped
-	}
 
-	return pd
-}
-
-// toString provides a best-effort string conversion for simple scalar types.
-func toString(v any) string {
-	switch t := v.(type) {
-	case string:
-		return t
-	case fmt.Stringer:
-		return t.String()
-	case int, int8, int16, int32, int64,
-		uint, uint8, uint16, uint32, uint64,
-		float32, float64, bool:
-		return fmt.Sprintf("%v", v)
-	default:
-		return ""
-	}
-}
-
-// ToolFunctionDefinition describes a function for a tool.
-type ToolFunctionDefinition struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Strict      bool               `json:"strict,omitempty"`
-	Parameters  PropertyDefinition `json:"parameters,omitempty"`
-}
-
-// ToolDefinition is a representation of a tool the LLM can use.
-type ToolDefinition struct {
-	Type     string                 `json:"type"`
-	Function ToolFunctionDefinition `json:"function"`
-}
-
-type FunctionDefinition struct {
-	Name      string  `json:"name"`
-	Arguments jsonMap `json:"arguments"`
-}
-
-// ToolCallRequest represents a tool call decided by the LLM.
-// This object may be used to know which function to call and with which arguments.
-type ToolCallRequest struct {
-	ID       string             `json:"id"`
-	Index    int                `json:"index,omitempty"`
-	Function FunctionDefinition `json:"function"`
-}
-
-func NewToolCallRequest(id string, index int, funcName string, args any) ToolCallRequest {
-	var a jsonMap
-	if c, ok := args.(jsonMap); !ok {
-		a = jsonMap{"input": args}
+		ct = cts
 	} else {
-		a = c
+		return nil, fmt.Errorf("invalid content type: %T", raw["content"])
 	}
-
-	return ToolCallRequest{
-		ID:       id,
-		Index:    index,
-		Function: FunctionDefinition{Name: funcName, Arguments: a},
-	}
+	return ct, nil
 }

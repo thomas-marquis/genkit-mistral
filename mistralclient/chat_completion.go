@@ -26,7 +26,7 @@ type ChatCompletionRequest struct {
 
 type MessageResponse struct {
 	Message
-	ToolCalls []ToolCallRequest `json:"tool_calls,omitempty"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
 type ChatCompletionChoice struct {

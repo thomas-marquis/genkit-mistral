@@ -1,6 +1,8 @@
 package mistralclient
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type ContentType string
 
@@ -9,7 +11,6 @@ func (c ContentType) String() string {
 }
 
 const (
-	ContentTypeString      ContentType = "string"
 	ContentTypeText        ContentType = "text"
 	ContentTypeImageURL    ContentType = "image_url"
 	ContentTypeDocumentURL ContentType = "document_url"
@@ -20,15 +21,36 @@ const (
 )
 
 type Content interface {
-	Type() ContentType
+	String() string
+	Chunks() []ContentChunk
 }
 
-type StringContent string
+type ContentString string
 
-var _ Content = StringContent("")
+var _ Content = (*ContentString)(nil)
 
-func (c StringContent) Type() ContentType {
-	return ContentTypeString
+func (s ContentString) String() string {
+	return string(s)
+}
+
+func (s ContentString) Chunks() []ContentChunk {
+	return nil
+}
+
+type ContentChunks []ContentChunk
+
+var _ Content = ContentChunks{}
+
+func (c ContentChunks) String() string {
+	return ""
+}
+
+func (c ContentChunks) Chunks() []ContentChunk {
+	return c
+}
+
+type ContentChunk interface {
+	Type() ContentType
 }
 
 type TextContent struct {
@@ -36,7 +58,7 @@ type TextContent struct {
 	Text        string      `json:"text"`
 }
 
-var _ Content = (*TextContent)(nil)
+var _ ContentChunk = (*TextContent)(nil)
 
 func NewTextContent(text string) *TextContent {
 	return &TextContent{
@@ -54,7 +76,7 @@ type ImageUrlContent struct {
 	ImageURL    string      `json:"image_url"`
 }
 
-var _ Content = (*ImageUrlContent)(nil)
+var _ ContentChunk = (*ImageUrlContent)(nil)
 
 func NewImageUrlContent(imageUrl string) *ImageUrlContent {
 	return &ImageUrlContent{
@@ -73,7 +95,7 @@ type DocumentUrlContent struct {
 	DocumentURL  string      `json:"document_url"`
 }
 
-var _ Content = (*DocumentUrlContent)(nil)
+var _ ContentChunk = (*DocumentUrlContent)(nil)
 
 func NewDocumentUrlContent(documentName, documentURL string) *DocumentUrlContent {
 	return &DocumentUrlContent{
@@ -92,7 +114,7 @@ type ReferenceContent struct {
 	ReferenceIds []int       `json:"reference_ids"`
 }
 
-var _ Content = (*ReferenceContent)(nil)
+var _ ContentChunk = (*ReferenceContent)(nil)
 
 func NewReferenceContent(referenceIds ...int) *ReferenceContent {
 	return &ReferenceContent{
@@ -110,7 +132,7 @@ type FileContent struct {
 	FileId      string      `json:"file_id"`
 }
 
-var _ Content = (*FileContent)(nil)
+var _ ContentChunk = (*FileContent)(nil)
 
 func NewFileContent(fileId string) *FileContent {
 	return &FileContent{
@@ -124,19 +146,19 @@ func (c *FileContent) Type() ContentType {
 }
 
 type ThinkContent struct {
-	ContentType ContentType `json:"type"`
-	Closed      bool        `json:"closed"`
-	Thinking    []Content   `json:"thinking"`
+	ContentType ContentType    `json:"type"`
+	Closed      bool           `json:"closed"`
+	Thinking    []ContentChunk `json:"thinking"`
 }
 
-var _ Content = (*ThinkContent)(nil)
+var _ ContentChunk = (*ThinkContent)(nil)
 var _ json.Unmarshaler = (*ThinkContent)(nil)
 
-func NewThinkContent(thinking ...Content) *ThinkContent {
+func NewThinkContent(thinking ...ContentChunk) *ThinkContent {
 	c := &ThinkContent{
 		ContentType: ContentTypeThink,
 		Closed:      true,
-		Thinking:    make([]Content, 0),
+		Thinking:    make([]ContentChunk, 0),
 	}
 	for _, t := range thinking {
 		if t == nil {
@@ -161,7 +183,7 @@ func (c *ThinkContent) UnmarshalJSON(data []byte) error {
 	}
 	c.ContentType = ContentType(res["type"].(string))
 	thinkings := res["thinking"].([]any)
-	c.Thinking = make([]Content, len(thinkings))
+	c.Thinking = make([]ContentChunk, len(thinkings))
 
 	for i, thinking := range thinkings {
 		t := thinking.(map[string]any)
@@ -196,7 +218,7 @@ type AudioContent struct {
 	InputAudio  string      `json:"input_audio"`
 }
 
-var _ Content = (*AudioContent)(nil)
+var _ ContentChunk = (*AudioContent)(nil)
 
 func NewAudioContent(inputAudio string) *AudioContent {
 	return &AudioContent{
