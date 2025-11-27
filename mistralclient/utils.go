@@ -15,27 +15,27 @@ var (
 // JsonMap unmarshal from either an object or a JSON string containing an object.
 type JsonMap map[string]any
 
-func (jm *JsonMap) UnmarshalJSON(b []byte) error {
-	t := strings.TrimSpace(string(b))
-	if t == "null" {
+func (jm *JsonMap) UnmarshalJSON(data []byte) error {
+	trimmedData := strings.TrimSpace(string(data))
+	if trimmedData == "null" {
 		*jm = nil
 		return nil
 	}
 
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err == nil {
-		*jm = m
+	var resMap map[string]any
+	if err := json.Unmarshal(data, &resMap); err == nil {
+		*jm = resMap
 		return nil
 	}
 
-	s, err := strconv.Unquote(t)
+	unquotedData, err := strconv.Unquote(trimmedData)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal([]byte(s), &m); err != nil {
+	if err := json.Unmarshal([]byte(unquotedData), &resMap); err != nil {
 		return err
 	}
-	*jm = m
+	*jm = resMap
 	return nil
 }
 

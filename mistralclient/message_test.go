@@ -62,6 +62,7 @@ func TestUserMessage(t *testing.T) {
 	t.Run("should be unmarshaled from json with chunked content", func(t *testing.T) {
 		j := `{
 			"role": "user", 
+			"tool_calls": null,
 			"content": [
 				{"type": "text", "text": "hello"},
 				{"image_url": "https://example.com/image.png", "type": "image_url"},
@@ -142,6 +143,7 @@ func TestAssistantMessage(t *testing.T) {
 	t.Run("should be unmarshaled from json with chunked content", func(t *testing.T) {
 		j := `{
 			"role": "assistant", 
+			"tool_calls": null,
 			"content": [
 				{"type": "text", "text": "hello"},
 				{"image_url": "https://example.com/image.png", "type": "image_url"},

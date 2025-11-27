@@ -158,7 +158,7 @@ func (m *AssistantMessage) UnmarshalJSON(data []byte) error {
 
 	m.Role = Role(res["role"].(string))
 
-	if tcs, ok := res["tool_calls"]; ok {
+	if tcs, ok := res["tool_calls"]; ok && tcs != nil {
 		m.ToolCalls = make([]ToolCall, len(tcs.([]any)))
 		for i, tc := range tcs.([]any) {
 			m.ToolCalls[i] = ToolCall{}

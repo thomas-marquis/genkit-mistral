@@ -41,7 +41,7 @@ type ChatCompletionRequest struct {
 	// Setting to \{ "type": "json_object" \} enables JSON mode, which guarantees the message the model generates is in JSON.
 	// When using JSON mode you MUST also instruct the model to produce JSON yourself with a system or a user message.
 	// Setting to \{ "type": "json_schema" \} enables JSON schema mode, which guarantees the message the model generates is in JSON and follows the schema you provide.
-	ResponseFormat ResponseFormat `json:"response_format,omitempty"`
+	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
 
 	Tools []Tool `json:"tools,omitempty"`
 
@@ -108,7 +108,9 @@ type ChatCompletionResponse struct {
 	Latency time.Duration
 }
 
-func (r *ChatCompletionResponse) UnmarshallJSON(data []byte) error {
+var _ json.Unmarshaler = (*ChatCompletionResponse)(nil)
+
+func (r *ChatCompletionResponse) UnmarshalJSON(data []byte) error {
 	type Alias ChatCompletionResponse
 	aux := &struct {
 		*Alias
@@ -119,7 +121,7 @@ func (r *ChatCompletionResponse) UnmarshallJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	r.Created = time.Unix(aux.Created, 0)
+	r.Created = time.Unix(aux.Created, 0).UTC()
 	return nil
 }
 
@@ -139,13 +141,21 @@ const (
 	FinishReasonToolCalls   FinishReason = "tool_calls"
 )
 
+type ResponseFormatType string
+
+const (
+	ResponseFormatText       ResponseFormatType = "text"
+	ResponseFormatJsonObject ResponseFormatType = "json_object"
+	ResponseFormatJsonSchema ResponseFormatType = "json_schema"
+)
+
 type ResponseFormat struct {
-	Type       string      `json:"type"`
-	JsonSchema *JsonSchema `json:"json_schema,omitempty"`
+	Type       ResponseFormatType `json:"type"`
+	JsonSchema *JsonSchema        `json:"json_schema,omitempty"`
 }
 
 type chatCompletionOptions struct {
-	ResponseFormat string
+	ResponseFormat ResponseFormatType
 	JsonSchema     *JsonSchema
 	Tools          []Tool
 	ToolChoice     ToolChoiceType
@@ -155,7 +165,25 @@ type ChatCompletionOption func(*chatCompletionOptions)
 
 func WithResponseTextFormat() ChatCompletionOption {
 	return func(opts *chatCompletionOptions) {
-		opts.ResponseFormat = "text"
+		opts.ResponseFormat = ResponseFormatText
+		opts.JsonSchema = nil
+	}
+}
+
+func WithResponseJsonSchema(schema any) ChatCompletionOption {
+	return func(opts *chatCompletionOptions) {
+		opts.ResponseFormat = ResponseFormatJsonSchema
+		opts.JsonSchema = &JsonSchema{
+			Name:   "responseJsonSchema",
+			Schema: schema,
+			Strict: true,
+		}
+	}
+}
+
+func WithResponseJsonObjectFormat() ChatCompletionOption {
+	return func(opts *chatCompletionOptions) {
+		opts.ResponseFormat = ResponseFormatJsonObject
 		opts.JsonSchema = nil
 	}
 }
@@ -170,17 +198,6 @@ func WithTools(tools []Tool) ChatCompletionOption {
 func WithToolChoice(toolChoice ToolChoiceType) ChatCompletionOption {
 	return func(opts *chatCompletionOptions) {
 		opts.ToolChoice = toolChoice
-	}
-}
-
-func WithResponseJsonSchema(schema any) ChatCompletionOption {
-	return func(opts *chatCompletionOptions) {
-		opts.ResponseFormat = "json_schema"
-		opts.JsonSchema = &JsonSchema{
-			Name:   "responseJsonSchema",
-			Schema: schema,
-			Strict: true,
-		}
 	}
 }
 
@@ -205,7 +222,13 @@ func (c *clientImpl) ChatCompletion(
 	reqBody.Temperature = cfg.Temperature
 	reqBody.TopP = cfg.TopP
 	reqBody.Stop = cfg.StopSequences
-	reqBody.ResponseFormat = ResponseFormat{Type: opt.ResponseFormat, JsonSchema: opt.JsonSchema}
+
+	switch opt.ResponseFormat {
+	case ResponseFormatJsonSchema:
+		reqBody.ResponseFormat = &ResponseFormat{Type: opt.ResponseFormat, JsonSchema: opt.JsonSchema}
+	case ResponseFormatJsonObject, ResponseFormatText:
+		reqBody.ResponseFormat = &ResponseFormat{Type: opt.ResponseFormat, JsonSchema: nil}
+	}
 
 	if len(opt.Tools) > 0 {
 		reqBody.Tools = opt.Tools
