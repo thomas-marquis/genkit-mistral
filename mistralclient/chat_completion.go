@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -29,17 +28,22 @@ type ChatCompletionRequest struct {
 	// Call the /models endpoint to retrieve the appropriate value.
 	Temperature float64 `json:"temperature,omitempty"`
 
-	TopP int `json:"top_p,omitempty"`
+	// TopP is the nucleus sampling, where the model considers the results of the tokens with top_p probability mass.
+	//
+	// So 0.1 means only the tokens comprising the top 10% probability mass are considered.
+	// We generally recommend altering this or temperature but not both.
+	// Default to 1.0
+	TopP float64 `json:"top_p,omitempty"`
 
 	// ResponseFormat specifies the format that the model must output.
 	//
-	// By default it will use \{ "type": "text" \}.
+	// By default, it will use \{ "type": "text" \}.
 	// Setting to \{ "type": "json_object" \} enables JSON mode, which guarantees the message the model generates is in JSON.
 	// When using JSON mode you MUST also instruct the model to produce JSON yourself with a system or a user message.
 	// Setting to \{ "type": "json_schema" \} enables JSON schema mode, which guarantees the message the model generates is in JSON and follows the schema you provide.
 	ResponseFormat ResponseFormat `json:"response_format,omitempty"`
 
-	Tools []ToolDefinition `json:"tools,omitempty"`
+	Tools []Tool `json:"tools,omitempty"`
 
 	// ToolChoice controls which (if any) tool is called by the model.
 	//
@@ -93,32 +97,58 @@ func NewChatCompletionRequest(messages []ChatMessage, model string) ChatCompleti
 	}
 }
 
-type MessageResponse struct {
-	Message
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+type ChatCompletionResponse struct {
+	Choices []ChatCompletionChoice `json:"choices"`
+	Created time.Time              `json:"created"`
+	Id      string                 `json:"id"`
+	Model   string                 `json:"model"`
+	Object  string                 `json:"object"`
+	Usage   UsageInfo              `json:"usage"`
+
+	Latency time.Duration
+}
+
+func (r *ChatCompletionResponse) UnmarshallJSON(data []byte) error {
+	type Alias ChatCompletionResponse
+	aux := &struct {
+		*Alias
+		Created int64 `json:"created"`
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	r.Created = time.Unix(aux.Created, 0)
+	return nil
 }
 
 type ChatCompletionChoice struct {
-	Index        int             `json:"index"`
-	Message      MessageResponse `json:"message"`
-	FinishReason string          `json:"finish_reason"`
+	FinishReason FinishReason      `json:"finish_reason"`
+	Index        int               `json:"index"`
+	Message      *AssistantMessage `json:"message"`
 }
 
-type ChatCompletionResponse struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"`
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
-	Choices []ChatCompletionChoice `json:"choices"`
-	Usage   UsageResponse          `json:"usage"`
-	Latency time.Duration          `json:"latency_ms,omitempty"`
+type FinishReason string
+
+const (
+	FinishReasonLength      FinishReason = "length"
+	FinishReasonStop        FinishReason = "stop"
+	FinishReasonModelLength FinishReason = "model_length"
+	FinishReasonError       FinishReason = "error"
+	FinishReasonToolCalls   FinishReason = "tool_calls"
+)
+
+type ResponseFormat struct {
+	Type       string      `json:"type"`
+	JsonSchema *JsonSchema `json:"json_schema,omitempty"`
 }
 
 type chatCompletionOptions struct {
 	ResponseFormat string
 	JsonSchema     *JsonSchema
-	Tools          []ToolDefinition
-	ToolChoice     ToolChoice
+	Tools          []Tool
+	ToolChoice     ToolChoiceType
 }
 
 type ChatCompletionOption func(*chatCompletionOptions)
@@ -130,47 +160,14 @@ func WithResponseTextFormat() ChatCompletionOption {
 	}
 }
 
-func WithTools(tools []ToolDefinition) ChatCompletionOption {
+func WithTools(tools []Tool) ChatCompletionOption {
 	return func(opts *chatCompletionOptions) {
 		opts.Tools = tools
 		opts.ToolChoice = ToolChoiceAuto
 	}
 }
 
-// ToolChoice defines how the model should use tools or not.
-type ToolChoice string
-
-func (tc ToolChoice) String() string {
-	return string(tc)
-}
-
-// NewToolChoice creates a new ToolChoice from a string.
-func NewToolChoice(choice string) ToolChoice {
-	switch strings.ToLower(choice) {
-	case ToolChoiceAuto.String():
-		return ToolChoiceAuto
-	case ToolChoiceAny.String():
-		return ToolChoiceAny
-	case ToolChoiceNone.String():
-		return ToolChoiceNone
-	case "":
-		return ""
-	default:
-		logger.Printf("Invalid tool choice: %s. Using empty value.", choice)
-		return ""
-	}
-}
-
-const (
-	// ToolChoiceAuto is the default mode. Model decides if it uses the tool or not.
-	ToolChoiceAuto ToolChoice = "auto"
-	// ToolChoiceAny forces the model to use a tool.
-	ToolChoiceAny ToolChoice = "any"
-	// ToolChoiceNone prevent model to use a tool.
-	ToolChoiceNone ToolChoice = "none"
-)
-
-func WithToolChoice(toolChoice ToolChoice) ChatCompletionOption {
+func WithToolChoice(toolChoice ToolChoiceType) ChatCompletionOption {
 	return func(opts *chatCompletionOptions) {
 		opts.ToolChoice = toolChoice
 	}
@@ -189,7 +186,7 @@ func WithResponseJsonSchema(schema any) ChatCompletionOption {
 
 func (c *clientImpl) ChatCompletion(
 	ctx context.Context,
-	messages []Message,
+	messages []ChatMessage,
 	model string,
 	cfg *ModelConfig,
 	opts ...ChatCompletionOption,
@@ -203,19 +200,12 @@ func (c *clientImpl) ChatCompletion(
 
 	url := fmt.Sprintf("%s/v1/chat/completions", c.baseURL)
 
-	reqBody := ChatCompletionRequest{
-		Messages:    messages,
-		Model:       model,
-		Temperature: cfg.Temperature,
-		MaxTokens:   cfg.MaxOutputTokens,
-		TopP:        int(cfg.TopP),
-		Stream:      false, // TODO: Implement streaming later
-		Stop:        cfg.StopSequences,
-		ResponseFormat: ResponseFormat{
-			Type:       opt.ResponseFormat,
-			JsonSchema: opt.JsonSchema,
-		},
-	}
+	reqBody := NewChatCompletionRequest(messages, model)
+	reqBody.MaxTokens = cfg.MaxOutputTokens
+	reqBody.Temperature = cfg.Temperature
+	reqBody.TopP = cfg.TopP
+	reqBody.Stop = cfg.StopSequences
+	reqBody.ResponseFormat = ResponseFormat{Type: opt.ResponseFormat, JsonSchema: opt.JsonSchema}
 
 	if len(opt.Tools) > 0 {
 		reqBody.Tools = opt.Tools

@@ -39,6 +39,13 @@ func (jm *JsonMap) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type JsonSchema struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Schema      any    `json:"schema"`
+	Strict      bool   `json:"strict,omitempty"`
+}
+
 func mapToStruct(from map[string]any, to any) error {
 	j, err := json.Marshal(from)
 	if err != nil {

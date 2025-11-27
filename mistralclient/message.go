@@ -25,6 +25,14 @@ func NewSystemMessage(content Content) *SystemMessage {
 	return m
 }
 
+func NewSystemMessageFromString(content string) *SystemMessage {
+	m := &SystemMessage{
+		Role:    RoleSystem,
+		Content: ContentString(content),
+	}
+	return m
+}
+
 func (m *SystemMessage) Type() Role {
 	return RoleSystem
 }
@@ -80,6 +88,13 @@ func NewUserMessage(content Content) *UserMessage {
 	}
 }
 
+func NewUserMessageFromString(content string) *UserMessage {
+	return &UserMessage{
+		Role:    RoleUser,
+		Content: ContentString(content),
+	}
+}
+
 func (m *UserMessage) Type() Role {
 	return RoleUser
 }
@@ -114,6 +129,14 @@ func NewAssistantMessage(content Content, toolCalls ...ToolCall) *AssistantMessa
 	return &AssistantMessage{
 		Role:      RoleAssistant,
 		Content:   content,
+		ToolCalls: toolCalls,
+	}
+}
+
+func NewAssistantMessageFromString(content string, toolCalls ...ToolCall) *AssistantMessage {
+	return &AssistantMessage{
+		Role:      RoleAssistant,
+		Content:   ContentString(content),
 		ToolCalls: toolCalls,
 	}
 }

@@ -19,9 +19,10 @@ const (
 
 type Client interface {
 	TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error)
+
 	ChatCompletion(
 		ctx context.Context,
-		messages []Message,
+		messages []ChatMessage,
 		model string,
 		cfg *ModelConfig,
 		opts ...ChatCompletionOption,

@@ -2,6 +2,8 @@ package mistralclient_test
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 )
 
@@ -53,8 +56,75 @@ func makeMockServer(t *testing.T, method, path, jsonResponse string, responseCod
 	}))
 }
 
-func Test_ChatCompletion_ShouldReturnMessageWhenSucceed(t *testing.T) {
-	mockServer := makeMockServer(t, "POST", "/v1/chat/completions", `
+func TestChatCompletion(t *testing.T) {
+	t.Run("Should call Mistral /chat/completion endpoint", func(t *testing.T) {
+		mockServer := makeMockServer(t, "POST", "/v1/chat/completions", `
+				{
+					"id": "1234567",
+					"created": 1764230687,
+					"model": "mistral-small-latest",
+					"usage": {
+						"prompt_tokens": 13,
+						"total_tokens": 23,
+						"completion_tokens": 10
+					},
+					"object": "chat.completion",
+					"choices": [
+						{
+							"index": 0,
+							"finish_reason": "stop",
+							"message": {
+								"role": "assistant",
+								"tool_calls": null,
+								"content": "Hello! How can I assist you today?"
+							}
+						}
+					]
+				}`, http.StatusOK)
+		defer mockServer.Close()
+
+		// Given
+		ctx := context.TODO()
+		c := mistralclient.NewClient("fakeApiKey", mistralclient.WithBaseAPIURL(mockServer.URL))
+		inputMsgs := []mistralclient.ChatMessage{
+			mistralclient.NewSystemMessageFromString("You are a helpful assistant."),
+			mistralclient.NewUserMessageFromString("Hello!"),
+		}
+
+		//reqJson := `{
+		//	"model": "mistral-small-latest",
+		//	"messages": [
+		//		{
+		//			"role": "system",
+		//			"content": "You are a helpful assistant."
+		//		},
+		//		{
+		//			"role" :"user",
+		//			"content": "Hello!"
+		//		}
+		//	],
+		//	"parallel_tool_calls":true
+		//}`
+
+		// When
+		res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-small-latest", &mistralclient.ModelConfig{})
+
+		// Then
+		assert.NoError(t, err)
+		assert.Len(t, res.Choices, 1)
+		assert.Equal(t, mistralclient.NewAssistantMessageFromString("Hello, how can I assist you?"), res.Choices[0].Message)
+
+		// Check usage
+		assert.Equal(t, 13, res.Usage.PromptTokens)
+		assert.Equal(t, 23, res.Usage.TotalTokens)
+		assert.Equal(t, 10, res.Usage.CompletionTokens)
+
+		assert.Equal(t, "chat.completion", res.Object)
+		assert.Equal(t, "mistral-small-latest", res.Model)
+	})
+
+	t.Run("should call Mistral with tools, tool choice and multiple messages", func(t *testing.T) {
+		mockServer := makeMockServer(t, "POST", "/v1/chat/completions", `
 				{
 					"choices": [
 						{
@@ -65,26 +135,63 @@ func Test_ChatCompletion_ShouldReturnMessageWhenSucceed(t *testing.T) {
 						}
 					]
 				}`, http.StatusOK)
-	defer mockServer.Close()
+		defer mockServer.Close()
+
+		// Given
+		ctx := context.TODO()
+		c := mistralclient.NewClient("fakeApiKey", mistralclient.WithBaseAPIURL(mockServer.URL))
+		inputMsgs := []mistralclient.ChatMessage{
+			mistralclient.NewSystemMessageFromString("You are a helpful assistant."),
+			mistralclient.NewUserMessageFromString("Hello!"),
+		}
+
+		// When
+		res, err := c.ChatCompletion(ctx,
+			inputMsgs,
+			"mistral/mistral-large",
+			&mistralclient.ModelConfig{},
+			mistralclient.WithTools([]mistralclient.Tool{
+				mistralclient.NewFuncTool("add", "add two numbers", map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"a": map[string]any{
+							"type": "number",
+						},
+						"b": map[string]any{
+							"type": "number",
+						},
+					},
+				}),
+				mistralclient.NewFuncTool("getUserById", "get user by id", map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"id": map[string]any{
+							"type": "string",
+						},
+					},
+				}),
+			}),
+			mistralclient.WithToolChoice(mistralclient.ToolChoiceAny),
+		)
+
+		//expectedJsonRequest := `{
+		//
+		//}`
+
+		// Then
+		assert.NoError(t, err)
+		assert.Len(t, res.Choices, 1)
+		assert.Equal(t, mistralclient.NewAssistantMessageFromString("Hello, how can I assist you?"), res.Choices[0].Message)
+
+	})
+}
+
+func Test_ChatCompletion_ShouldReturnMessageWhenSucceed(t *testing.T) {
 
 	//fakeApiKey := "fake-api-key"
 
 	t.Run("Successful ChatCompletion", func(t *testing.T) {
-		// Given
-		//ctx := context.TODO()
-		//c := mistralclient.NewClient(fakeApiKey, mistralclient.WithBaseAPIURL(mockServer.URL))
-		//inputMsgs := []mistralclient.Message{
-		//	mistralclient.NewSystemMessage("You are a helpful assistant."),
-		//	mistralclient.NewUserMessage("Hello!"),
-		//}
-		//
-		//// When
-		//res, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
-		//
-		//// Then
-		//assert.NoError(t, err)
-		//assert.Len(t, res.Choices, 1)
-		//assert.Equal(t, mistralclient.NewAssistantMessage("Hello, how can I assist you?"), res.Choices[0].Message.Message)
+
 	})
 }
 
@@ -238,4 +345,37 @@ func Test_ChatCompletion_ShouldFailWhenMaxRetriesReached(t *testing.T) {
 	//// Then
 	//assert.Error(t, err, "expected error")
 	//assert.Equal(t, int32(3), atomic.LoadInt32(&attempts), "expected 3 attempts")
+}
+
+func TestChatCompletionResponse(t *testing.T) {
+	t.Run("should unmarshall with correct created_at time format", func(t *testing.T) {
+		j := `{
+			"id": "12345",
+			"created": 1764230687,
+			"model": "mistral-small-latest",
+			"usage": {
+				"prompt_tokens": 13,
+				"total_tokens": 23,
+				"completion_tokens": 10
+			},
+			"object": "chat.completion",
+			"choices": [
+				{
+					"index": 0,
+					"finish_reason": "stop",
+					"message": {
+						"role": "assistant",
+						"tool_calls": null,
+						"content": "Hello! How can I assist you today?"
+					}
+				}
+			]
+		}`
+
+		var tc mistralclient.ChatCompletionResponse
+
+		assert.NoError(t, json.Unmarshal([]byte(j), &tc))
+		// Thu, 27 Nov 2025 08:07:16 GMT
+		assert.Equal(t, time.Date(2026, time.November, 27, 8, 7, 16, 0, nil), tc.Created)
+	})
 }
