@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 )
@@ -246,16 +245,12 @@ func (c *clientImpl) ChatCompletion(
 	}
 	defer response.Body.Close()
 
-	respBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return ChatCompletionResponse{}, fmt.Errorf("failed to read response body: %w", err)
-	}
 	if c.verbose {
 		logger.Printf("ChatCompletion called")
 	}
 
 	var resp ChatCompletionResponse
-	if err := json.Unmarshal(respBody, &resp); err != nil {
+	if err := unmarshallBody(response, &resp); err != nil {
 		return ChatCompletionResponse{}, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 	resp.Latency = lat

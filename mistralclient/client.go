@@ -3,6 +3,7 @@ package mistralclient
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -142,6 +143,10 @@ func (c *clientImpl) nextBackoff(attempt int) time.Duration {
 	return jitter
 }
 
+func unmarshallBody(resp *http.Response, v interface{}) error {
+	return json.NewDecoder(resp.Body).Decode(v)
+}
+
 func sendRequest(ctx context.Context, c *clientImpl, method, url string, body []byte) (*http.Response, time.Duration, error) {
 	// attempt = 0 is the first try; we perform up to (1 + retryMaxRetries) attempts total.
 	for attempt := 0; attempt <= c.retryMaxRetries; attempt++ {
@@ -172,6 +177,14 @@ func sendRequest(ctx context.Context, c *clientImpl, method, url string, body []
 				}
 			}
 			return nil, 0, fmt.Errorf("failed to make HTTP request: %w", err)
+		}
+
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			var errResponse ErrorResponse
+			if err := unmarshallBody(resp, &errResponse); err != nil {
+				return nil, 0, fmt.Errorf("failed to unmarshal error response: %w", err)
+			}
+			return nil, 0, &errResponse
 		}
 
 		if resp.StatusCode != http.StatusOK {

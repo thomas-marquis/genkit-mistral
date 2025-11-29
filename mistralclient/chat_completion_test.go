@@ -329,6 +329,7 @@ func TestChatCompletion(t *testing.T) {
 	})
 
 	t.Run("Should not retry on 400 and fail immediately", func(t *testing.T) {
+		// Given
 		var attempts int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			atomic.AddInt32(&attempts, 1)
@@ -369,13 +370,33 @@ func TestChatCompletion(t *testing.T) {
 		ctx := context.Background()
 		inputMsgs := []mistralclient.ChatMessage{mistralclient.NewUserMessageFromString("Hi!")}
 
+		// When
 		_, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
+
+		// Then
+		expectedErr := &mistralclient.ErrorResponse{
+			Object: "error",
+			Message: mistralclient.ErrorResponseMessage{
+				Detail: []mistralclient.ErrorResponseDetail{
+					{
+						Type:  "extra_forbidden",
+						Loc:   []string{"body", "parallel_tool_callss"},
+						Msg:   "Extra inputs are not permitted",
+						Input: true,
+					},
+				},
+			},
+			Type:  "invalid_request_error",
+			Param: nil,
+			Code:  nil,
+		}
 		assert.Error(t, err)
-		assert.Equal(t, mistralclient.ErrorResponse{}, err)
+		assert.Equal(t, expectedErr, err)
 		assert.Equal(t, int32(1), atomic.LoadInt32(&attempts))
 	})
 
 	t.Run("Should retry on timeout error then succeed", func(t *testing.T) {
+		// Given
 		successJSON := []byte(`{"choices":[{"message":{"role":"assistant","content":"OK after timeout"}}]}`)
 		cfg := &mistralclient.Config{
 			Verbose:           false,
@@ -393,13 +414,17 @@ func TestChatCompletion(t *testing.T) {
 		ctx := context.Background()
 		inputMsgs := []mistralclient.ChatMessage{mistralclient.NewUserMessageFromString("Hello")}
 
+		// When
 		res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
+
+		// Then
 		assert.NoError(t, err)
 		assert.Len(t, res.Choices, 1)
 		assert.Equal(t, mistralclient.NewAssistantMessageFromString("OK after timeout"), res.Choices[0].Message)
 	})
 
 	t.Run("Should fail when max retries reached", func(t *testing.T) {
+		// Given
 		var attempts int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			atomic.AddInt32(&attempts, 1)
@@ -418,193 +443,13 @@ func TestChatCompletion(t *testing.T) {
 		ctx := context.Background()
 		inputMsgs := []mistralclient.ChatMessage{mistralclient.NewUserMessageFromString("Hi")}
 
+		// When
 		_, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
+
+		// Then
 		assert.Error(t, err)
 		assert.Equal(t, int32(3), atomic.LoadInt32(&attempts))
 	})
-
-	t.Run("Response should unmarshal with correct created_at time format", func(t *testing.T) {
-		j := `{
-            "id": "12345",
-            "created": 1764278339,
-            "model": "mistral-small-latest",
-            "usage": {
-                "prompt_tokens": 13,
-                "total_tokens": 23,
-                "completion_tokens": 10
-            },
-            "object": "chat.completion",
-            "choices": [
-                {
-                    "index": 0,
-                    "finish_reason": "stop",
-                    "message": {
-                        "role": "assistant",
-                        "tool_calls": null,
-                        "content": "Hello! How can I assist you today?"
-                    }
-                }
-            ]
-        }`
-
-		var tc mistralclient.ChatCompletionResponse
-		assert.NoError(t, json.Unmarshal([]byte(j), &tc))
-		assert.Equal(t, time.Date(2025, time.November, 27, 21, 18, 59, 0, time.UTC), tc.Created)
-	})
-}
-
-// Deprecated leftover tests removed: all ChatCompletion tests are now under TestChatCompletion.
-// Keeping a no-op to avoid accidental reintroduction.
-func Test_ChatCompletion_ShouldRetryOn5xxThenSucceeds(t *testing.T) {
-	var attempts int32
-
-	// Given
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&attempts, 1)
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
-			http.NotFound(w, r)
-			return
-		}
-		// First two attempts fail with 500, then succeed.
-		if atomic.LoadInt32(&attempts) <= 2 {
-			http.Error(w, `{"error":"temporary"}`, http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{ "message": { "role": "assistant", "content": "Hello after retries" } }
-			]
-		}`))
-	}))
-	defer srv.Close()
-
-	cfg := &mistralclient.Config{
-		Verbose:           false,
-		MistralAPIBaseURL: srv.URL,
-		RetryMaxRetries:   3,
-		RetryWaitMin:      1 * time.Millisecond,
-		RetryWaitMax:      5 * time.Millisecond,
-		RetryStatusCodes:  nil, // use defaults (includes 500)
-	}
-	c := mistralclient.NewClientWithConfig("fake-api-key", cfg)
-	var _ = c
-	//ctx := context.Background()
-	//inputMsgs := []mistralclient.Message{
-	//	mistralclient.NewUserMessage("Hi!"),
-	//}
-	//
-	//// When
-	//res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
-	//
-	//// Then
-	//assert.NoError(t, err, "expected no error")
-	//assert.Len(t, res.Choices, 1, "expected 1 choice")
-	//assert.Equal(t, mistralclient.NewAssistantMessage("Hello after retries"), res.Choices[0].Message.Message, "expected message")
-	//assert.Equal(t, int32(3), atomic.LoadInt32(&attempts), "expected 3 attempts")
-}
-
-func Test_ChatCompletion_ShouldNotRetryOn400AndFailsImmediately(t *testing.T) {
-	var attempts int32
-
-	// Given
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&attempts, 1)
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest) // 400 should NOT be retried
-	}))
-	defer srv.Close()
-
-	cfg := &mistralclient.Config{
-		Verbose:           false,
-		MistralAPIBaseURL: srv.URL,
-		RetryMaxRetries:   5, // even with high max, should not retry on 400
-		RetryWaitMin:      1 * time.Millisecond,
-		RetryWaitMax:      2 * time.Millisecond,
-	}
-	c := mistralclient.NewClientWithConfig("fake-api-key", cfg)
-	//ctx := context.Background()
-	//inputMsgs := []mistralclient.Message{mistralclient.NewUserMessage("Hi!")}
-	//
-	//// When
-	//_, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
-	//
-	//// Then
-	//if err == nil {
-	//	t.Fatalf("expected error, got nil")
-	//}
-	//if got := atomic.LoadInt32(&attempts); got != 1 {
-	//	t.Fatalf("expected exactly 1 attempt on 400, got %d", got)
-	//}
-	var _ = c
-}
-
-func Test_ChatCompletion_ShouldRetryOnTimeoutErrorThenSucceeds(t *testing.T) {
-	// Given
-	successJSON := []byte(`{"choices":[{"message":{"role":"assistant","content":"OK after timeout"}}]}`)
-	cfg := &mistralclient.Config{
-		Verbose:         false,
-		RetryMaxRetries: 3,
-		RetryWaitMin:    1 * time.Millisecond,
-		RetryWaitMax:    5 * time.Millisecond,
-		// Base URL irrelevant; transport short-circuits requests
-		MistralAPIBaseURL: "http://invalid.local",
-
-		// Set a flaky transport: fails once with timeout, then returns a success payload for ChatCompletion.
-		Transport: &flakyRoundTripper{
-			failuresLeft: 1,
-			successBody:  successJSON,
-		},
-		ClientTimeout: 2 * time.Second,
-	}
-	c := mistralclient.NewClientWithConfig("fake-api-key", cfg)
-
-	//ctx := context.Background()
-	//inputMsgs := []mistralclient.Message{mistralclient.NewUserMessage("Hello")}
-	var _ = c
-	//
-	//// When
-	//res, err := c.ChatCompletion(ctx, inputMsgs, "mistral-large", &mistralclient.ModelConfig{})
-	//
-	//// Then
-	//assert.NoError(t, err, "expected no error")
-	//assert.Len(t, res.Choices, 1, "expected 1 choice")
-	//assert.Equal(t, mistralclient.NewAssistantMessage("OK after timeout"), res.Choices[0].Message.Message, "expected message content")
-}
-
-func Test_ChatCompletion_ShouldFailWhenMaxRetriesReached(t *testing.T) {
-	var attempts int32
-
-	// Given: server always returns 503, expect retries to exhaust
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&attempts, 1)
-		http.Error(w, `{"error":"unavailable"}`, http.StatusServiceUnavailable)
-	}))
-	defer srv.Close()
-
-	cfg := &mistralclient.Config{
-		Verbose:           false,
-		MistralAPIBaseURL: srv.URL,
-		RetryMaxRetries:   2, // total 3 attempts
-		RetryWaitMin:      1 * time.Millisecond,
-		RetryWaitMax:      2 * time.Millisecond,
-	}
-	c := mistralclient.NewClientWithConfig("fake-api-key", cfg)
-	var _ = c
-
-	//ctx := context.Background()
-	//inputMsgs := []mistralclient.Message{mistralclient.NewUserMessage("Hi")}
-	//
-	//// When
-	//_, err := c.ChatCompletion(ctx, inputMsgs, "mistral/mistral-large", &mistralclient.ModelConfig{})
-	//
-	//// Then
-	//assert.Error(t, err, "expected error")
-	//assert.Equal(t, int32(3), atomic.LoadInt32(&attempts), "expected 3 attempts")
 }
 
 func TestChatCompletionResponse(t *testing.T) {
