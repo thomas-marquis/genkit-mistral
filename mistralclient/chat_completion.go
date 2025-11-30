@@ -206,7 +206,7 @@ func (c *clientImpl) ChatCompletion(
 	model string,
 	cfg *ModelConfig,
 	opts ...ChatCompletionOption,
-) (ChatCompletionResponse, error) {
+) (*ChatCompletionResponse, error) {
 	c.rateLimiter.Wait()
 
 	opt := &chatCompletionOptions{}
@@ -236,12 +236,12 @@ func (c *clientImpl) ChatCompletion(
 
 	jsonValue, err := json.Marshal(reqBody)
 	if err != nil {
-		return ChatCompletionResponse{}, fmt.Errorf("failed to marshal request body: %w", err)
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	response, lat, err := sendRequest(ctx, c, http.MethodPost, url, jsonValue)
 	if err != nil {
-		return ChatCompletionResponse{}, err
+		return nil, err
 	}
 	defer response.Body.Close()
 
@@ -251,9 +251,9 @@ func (c *clientImpl) ChatCompletion(
 
 	var resp ChatCompletionResponse
 	if err := unmarshallBody(response, &resp); err != nil {
-		return ChatCompletionResponse{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 	resp.Latency = lat
 
-	return resp, nil
+	return &resp, nil
 }

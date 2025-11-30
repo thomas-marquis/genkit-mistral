@@ -1,12 +1,16 @@
 package mistralclient
 
-import "strings"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 type ErrorResponseDetail struct {
-	Type  string `json:"type"`
-	Loc   []string
-	Msg   string
-	Input bool
+	Type  string   `json:"type"`
+	Loc   []string `json:"loc"`
+	Msg   string   `json:"msg"`
+	Input bool     `json:"input"`
 }
 
 type ErrorResponseMessage struct {
@@ -22,8 +26,41 @@ type ErrorResponse struct {
 }
 
 var _ error = (*ErrorResponse)(nil)
+var _ json.Unmarshaler = (*ErrorResponse)(nil)
 
-func (e ErrorResponse) Error() string {
+func (e *ErrorResponse) UnmarshalJSON(data []byte) error {
+	var value map[string]any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value == nil {
+		return nil
+	}
+	e.Object = value["object"].(string)
+	e.Type = value["type"].(string)
+	e.Param = value["param"]
+	e.Code = value["code"]
+
+	rawMsg := value["message"]
+	if rawMsg == nil {
+		return nil
+	}
+
+	if val, ok := rawMsg.(string); ok {
+		e.Message.Detail = append(e.Message.Detail, ErrorResponseDetail{Msg: val})
+	} else if val, ok := rawMsg.(map[string]any); ok {
+		var errMsg ErrorResponseMessage
+		if err := mapToStruct(val, &errMsg); err != nil {
+			return err
+		}
+		e.Message = errMsg
+	} else {
+		return fmt.Errorf("unexpected error response message format: %v", value)
+	}
+	return nil
+}
+
+func (e *ErrorResponse) Error() string {
 	msg := strings.Builder{}
 	msg.WriteString(e.Type)
 
@@ -32,16 +69,20 @@ func (e ErrorResponse) Error() string {
 	}
 
 	msg.WriteString(":")
-	for _, detail := range e.Message.Detail {
+	for i, detail := range e.Message.Detail {
 		msg.WriteString(" ")
-		msg.WriteString(detail.Type)
-		msg.WriteString(": ")
+		if detail.Type != "" {
+			msg.WriteString(detail.Type)
+			msg.WriteString(": ")
+		}
 		msg.WriteString(detail.Msg)
 		if len(detail.Loc) > 0 {
 			msg.WriteString(" ")
 			msg.WriteString("(" + strings.Join(detail.Loc, ".") + ")")
 		}
-		msg.WriteString(";")
+		if i < len(e.Message.Detail)-1 {
+			msg.WriteString(";")
+		}
 	}
 	return msg.String()
 }

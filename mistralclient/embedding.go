@@ -4,18 +4,43 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 )
 
 type EmbeddingVector []float32
 
+type EmbeddingEncodingFormat string
+
+const (
+	EmbeddingEncodingFloat  EmbeddingEncodingFormat = "float"
+	EmbeddingEncodingBase64 EmbeddingEncodingFormat = "base64"
+)
+
+type EmbeddingOutputDtype string
+
+const (
+	EmbeddingOutputDtypeFloat   EmbeddingOutputDtype = "float"
+	EmbeddingOutputDtypeInt8    EmbeddingOutputDtype = "int8"
+	EmbeddingOutputDtypeUInt8   EmbeddingOutputDtype = "uint8"
+	EmbeddingOutputDtypeBinary  EmbeddingOutputDtype = "binary"
+	EmbeddingOutputDtypeUBinary EmbeddingOutputDtype = "ubinary"
+)
+
 type EmbeddingRequest struct {
-	Model           string   `json:"model"`
-	Input           []string `json:"input"`
-	OutputDimension int      `json:"output_dimension,omitempty"`
-	OutputDtype     string   `json:"output_dtype,omitempty"`
+	// Model is the ID of the model to be used for embedding.
+	Model string `json:"model"`
+
+	// Input i the text content to be embedded.
+	Input []string `json:"input"`
+
+	// OutputDimension is the dimension of the output embeddings when feature available.
+	// If not provided, a default output dimension will be used.
+	OutputDimension int `json:"output_dimension,omitempty"`
+
+	OutputDtype EmbeddingOutputDtype `json:"output_dtype,omitempty"`
+
+	EncodingFormat EmbeddingEncodingFormat `json:"encoding_format,omitempty"`
 }
 
 type EmbeddingData struct {
@@ -41,7 +66,13 @@ func (r *EmbeddingResponse) Embeddings() []EmbeddingVector {
 	return vectors
 }
 
-func (c *clientImpl) TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error) {
+type EmbeddingOptions struct {
+	OutputType EmbeddingOutputDtype
+	OutputDim  int
+	Encoding   EmbeddingEncodingFormat
+}
+
+func (c *clientImpl) Embeddings(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error) {
 	c.rateLimiter.Wait()
 
 	url := fmt.Sprintf("%s/v1/embeddings", c.baseURL)
@@ -62,18 +93,12 @@ func (c *clientImpl) TextEmbedding(ctx context.Context, texts []string, model st
 	}
 	defer response.Body.Close()
 
-	respBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
 	if c.verbose {
-		logger.Println("TextEmbedding called")
+		logger.Println("Embeddings called")
 	}
 
 	var resp EmbeddingResponse
-	err = json.Unmarshal(respBody, &resp)
-	if err != nil {
+	if err = unmarshallBody(response, &resp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 

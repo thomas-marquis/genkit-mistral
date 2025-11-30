@@ -64,7 +64,7 @@ func (mr *MockClientMockRecorder) ChatCompletion(ctx, messages, model, cfg any, 
 // TextEmbedding mocks base method.
 func (m *MockClient) TextEmbedding(ctx context.Context, texts []string, model string) (*mistralclient.EmbeddingResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TextEmbedding", ctx, texts, model)
+	ret := m.ctrl.Call(m, "Embeddings", ctx, texts, model)
 	ret0, _ := ret[0].(*mistralclient.EmbeddingResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -73,5 +73,5 @@ func (m *MockClient) TextEmbedding(ctx context.Context, texts []string, model st
 // TextEmbedding indicates an expected call of TextEmbedding.
 func (mr *MockClientMockRecorder) TextEmbedding(ctx, texts, model any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TextEmbedding", reflect.TypeOf((*MockClient)(nil).TextEmbedding), ctx, texts, model)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Embeddings", reflect.TypeOf((*MockClient)(nil).TextEmbedding), ctx, texts, model)
 }

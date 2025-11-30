@@ -44,7 +44,7 @@ func defineEmbedder(client mistralclient.Client, modelName string) ai.Embedder {
 				texts[i] = StringFromParts(input.Content)
 			}
 
-			embResp, err := client.TextEmbedding(ctx, texts, modelName)
+			embResp, err := client.Embeddings(ctx, texts, modelName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get embedding: %w", err)
 			}

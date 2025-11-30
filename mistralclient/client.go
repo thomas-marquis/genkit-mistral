@@ -19,7 +19,7 @@ const (
 )
 
 type Client interface {
-	TextEmbedding(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error)
+	Embeddings(ctx context.Context, texts []string, model string) (*EmbeddingResponse, error)
 
 	ChatCompletion(
 		ctx context.Context,
@@ -27,7 +27,7 @@ type Client interface {
 		model string,
 		cfg *ModelConfig,
 		opts ...ChatCompletionOption,
-	) (ChatCompletionResponse, error)
+	) (*ChatCompletionResponse, error)
 }
 
 type clientImpl struct {
