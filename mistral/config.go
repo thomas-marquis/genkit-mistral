@@ -1,18 +1,18 @@
 package mistral
 
 import (
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
+	"github.com/thomas-marquis/mistral-client/mistral"
 )
 
 type Config struct {
-	Client mistralclient.Config
+	Client mistral.Client
 }
 
 type Option func(*Config)
 
-func WithClientConfig(cfg mistralclient.Config) Option {
+func WithClient(client mistral.Client) Option {
 	return func(c *Config) {
-		c.Client = cfg
+		c.Client = client
 	}
 }
 

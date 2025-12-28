@@ -9,8 +9,8 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/stretchr/testify/assert"
 	"github.com/thomas-marquis/genkit-mistral/mistral"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 	"github.com/thomas-marquis/genkit-mistral/mocks"
+	mistralclient "github.com/thomas-marquis/mistral-client/mistral"
 	"go.uber.org/mock/gomock"
 )
 
@@ -27,10 +27,10 @@ func Test_Embed_ShouldReturnAnSingleVector(t *testing.T) {
 	expectedVec := []float32{1, 2, 3}
 
 	mockClient.EXPECT().
-		TextEmbedding(
+		Embeddings(
 			gomock.AssignableToTypeOf(ctxType),
-			gomock.Eq([]string{inputText}),
-			gomock.Eq("mistral-embed")).
+			gomock.Eq(mistralclient.EmbeddingRequest{Model: "mistral-embed", Input: []string{inputText}}),
+		).
 		Return(&mistralclient.EmbeddingResponse{
 			Data: []mistralclient.EmbeddingData{
 				{
@@ -65,10 +65,9 @@ func Test_Embed_ShouldReturnMultipleVectors(t *testing.T) {
 	expectedVec2 := []float32{4, 5, 6}
 
 	mockClient.EXPECT().
-		TextEmbedding(
+		Embeddings(
 			gomock.AssignableToTypeOf(ctxType),
-			gomock.Eq([]string{"Hello, World!", "Hello there!\nMy name is Obi-Wan Kenobi."}),
-			gomock.Eq("mistral-embed")).
+			gomock.Eq(mistralclient.EmbeddingRequest{Model: "mistral-embed", Input: []string{"Hello, World!", "Hello there!"}})).
 		Return(&mistralclient.EmbeddingResponse{
 			Data: []mistralclient.EmbeddingData{
 				{
@@ -112,10 +111,10 @@ func Test_Embed_ShouldReturnErrorWhenNoVectorIsReturned(t *testing.T) {
 	mockClient := mocks.NewMockClient(ctrl)
 
 	mockClient.EXPECT().
-		TextEmbedding(
+		Embeddings(
 			gomock.AssignableToTypeOf(ctxType),
-			gomock.Eq([]string{"Hello, World!"}),
-			gomock.Eq("mistral-embed")).
+			gomock.Eq(mistralclient.EmbeddingRequest{Model: "mistral-embed", Input: []string{"Hello, World!"}}),
+		).
 		Return(&mistralclient.EmbeddingResponse{
 			Data: []mistralclient.EmbeddingData{},
 		}, nil)
@@ -146,7 +145,7 @@ func Test_Embed_ShouldReturnFakeVectorFromFakeModel(t *testing.T) {
 	inputText := "Hello, World!"
 
 	mockClient.EXPECT().
-		TextEmbedding(gomock.Any(), gomock.Any(), gomock.Any()).
+		Embeddings(gomock.Any(), gomock.Any()).
 		Times(0)
 
 	p := mistral.NewPlugin("fake")

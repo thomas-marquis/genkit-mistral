@@ -8,8 +8,8 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/stretchr/testify/assert"
 	"github.com/thomas-marquis/genkit-mistral/mistral"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
 	"github.com/thomas-marquis/genkit-mistral/mocks"
+	mistralclient "github.com/thomas-marquis/mistral-client/mistral"
 	"go.uber.org/mock/gomock"
 )
 
@@ -18,24 +18,22 @@ func Test_Generate_ShouldReturnGeneratedText(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := mocks.NewMockClient(ctrl)
 
-	messages := []mistralclient.Message{
-		mistralclient.NewSystemMessage("You are a helpful assistant."),
-		mistralclient.NewUserMessage("Hello!"),
+	messages := []mistralclient.ChatMessage{
+		mistralclient.NewSystemMessageFromString("You are a helpful assistant."),
+		mistralclient.NewUserMessageFromString("Hello!"),
 	}
 
 	mockClient.EXPECT().
 		ChatCompletion(
 			gomock.AssignableToTypeOf(ctxType),
-			gomock.Eq(messages),
-			gomock.Eq("mistral-small-latest"),
-			gomock.Any(),
-			gomock.Any(),
+			gomock.Eq(&mistralclient.ChatCompletionRequest{
+				Model:    "mistral-small-latest",
+				Messages: messages,
+			}),
 		).
 		Return(mistralclient.ChatCompletionResponse{
 			Choices: []mistralclient.ChatCompletionChoice{
-				{Message: mistralclient.MessageResponse{
-					Message: mistralclient.NewAssistantMessage("Hello simple human being!"),
-				}},
+				{Message: mistralclient.NewAssistantMessageFromString("Hello simple human being!")},
 			},
 		}, nil)
 
@@ -74,19 +72,16 @@ Use the following information to complete your task:
 	mockClient.EXPECT().
 		ChatCompletion(
 			gomock.AssignableToTypeOf(ctxType),
-			gomock.Eq([]mistralclient.Message{
-				mistralclient.NewSystemMessage("You are a helpful assistant."),
-				mistralclient.NewUserMessage(expectedUserMsg),
+			gomock.Cond(func(x *mistralclient.ChatCompletionRequest) bool {
+				return x.Model == "mistral-small-latest" &&
+					len(x.Messages) == 2 &&
+					x.Messages[0] == mistralclient.NewSystemMessageFromString("You are a helpful assistant.") &&
+					x.Messages[1] == mistralclient.NewUserMessageFromString(expectedUserMsg)
 			}),
-			gomock.Eq("mistral-small-latest"),
-			gomock.Any(),
-			gomock.Any(),
 		).
 		Return(mistralclient.ChatCompletionResponse{
 			Choices: []mistralclient.ChatCompletionChoice{
-				{Message: mistralclient.MessageResponse{
-					Message: mistralclient.NewAssistantMessage("Hello simple human being!"),
-				}},
+				{Message: mistralclient.NewAssistantMessageFromString("Hello simple human being!")},
 			},
 		}, nil)
 
@@ -123,9 +118,6 @@ func Test_Generate_ShouldReturnErrorWhenNoMessageProvided(t *testing.T) {
 
 	mockClient.EXPECT().
 		ChatCompletion(
-			gomock.Any(),
-			gomock.Any(),
-			gomock.Any(),
 			gomock.Any(),
 			gomock.Any(),
 		).

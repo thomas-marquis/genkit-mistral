@@ -3,9 +3,14 @@
 ### Code structure
 
 - mistral/ — Genkit plugin wiring (models, embedders, mapping between Genkit and Mistral)
-- mistralclient/ — Low-level HTTP client for Mistral (chat, embeddings, retries, rate limiting). No genkit notion must be used here. In other words, this package must be genkit agnostic.
 - internal/ — Small helpers and test fixtures
 - scripts/ — Local and CI helpers
+
+### Install gomock
+
+```bash
+go install go.uber.org/mock/mockgen@latest
+```
 
 ### Running tests
 

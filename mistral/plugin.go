@@ -3,10 +3,11 @@ package mistral
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
-	mistralclient "github.com/gage-technologies/mistral-go"
+	"github.com/thomas-marquis/mistral-client/mistral"
 )
 
 const providerID = "mistral"
@@ -455,7 +456,7 @@ type Plugin struct {
 	sync.Mutex
 
 	APIKey string
-	Client *mistralclient.MistralClient
+	Client mistral.Client
 
 	config *Config
 }
@@ -473,7 +474,12 @@ func (p *Plugin) Name() string {
 
 func (p *Plugin) Init(ctx context.Context) []api.Action {
 	if p.Client == nil {
-		p.Client = mistralclient.NewMistralClientDefault(p.APIKey)
+		p.Client = mistral.New(p.APIKey)
+	}
+
+	mistralModels, err := p.Client.ListModels(ctx)
+	if err != nil {
+		panic(err)
 	}
 
 	p.Lock()
@@ -481,11 +487,9 @@ func (p *Plugin) Init(ctx context.Context) []api.Action {
 
 	var actions []api.Action
 
-	for name, info := range llmModels {
-		models := defineModel(p.Client, name, info)
-		for _, model := range models {
-			actions = append(actions, model.(api.Action))
-		}
+	for _, card := range mistralModels {
+		model := defineModel(p.Client, mapCardToModelInfo(card))
+		actions = append(actions, model.(api.Action))
 	}
 	actions = append(actions, defineFakeModel().(api.Action))
 
@@ -498,3 +502,25 @@ func (p *Plugin) Init(ctx context.Context) []api.Action {
 }
 
 var _ api.Plugin = &Plugin{}
+
+func mapCardToModelInfo(card *mistral.BaseModelCard) *ai.ModelInfo {
+	stage := ai.ModelStageStable
+	if !card.Deprecation.IsZero() && card.Deprecation.After(time.Now()) {
+		stage = ai.ModelStageDeprecated
+	}
+
+	return &ai.ModelInfo{
+		Label: card.Id,
+		Stage: stage,
+		Supports: &ai.ModelSupports{
+			Constrained: ai.ConstrainedSupportAll,
+			Context:     false,
+			Media:       card.Capabilities.Vision || card.Capabilities.Audio,
+			Multiturn:   card.Capabilities.CompletionChat,
+			SystemRole:  card.Capabilities.CompletionChat,
+			ToolChoice:  card.Capabilities.FunctionCalling,
+			Tools:       card.Capabilities.FunctionCalling,
+		},
+		Versions: card.Aliases,
+	}
+}

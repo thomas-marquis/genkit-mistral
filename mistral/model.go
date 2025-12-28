@@ -2,14 +2,15 @@ package mistral
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
 	"strings"
 
 	"github.com/firebase/genkit/go/core/api"
-	mistralclient "github.com/gage-technologies/mistral-go"
 	"github.com/thomas-marquis/genkit-mistral/internal"
+	"github.com/thomas-marquis/mistral-client/mistral"
 
 	"github.com/firebase/genkit/go/ai"
 )
@@ -22,9 +23,9 @@ var (
 	ErrInvalidModelInput = fmt.Errorf("invalid model input")
 )
 
-func defineSingleModel(c *mistralclient.MistralClient, modelName string, modelInfo *ai.ModelInfo) ai.Model {
+func defineModel(c mistral.Client, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
-		api.NewName(providerID, modelName),
+		api.NewName(providerID, modelInfo.Label),
 		&ai.ModelOptions{
 			Label:    modelInfo.Label,
 			Stage:    modelInfo.Stage,
@@ -32,7 +33,7 @@ func defineSingleModel(c *mistralclient.MistralClient, modelName string, modelIn
 			Versions: modelInfo.Versions,
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			cfg, err := getConfigFromRequest(mr)
+			cfg, err := configFromRequest(mr)
 			if err != nil {
 				return nil, err
 			}
@@ -40,37 +41,36 @@ func defineSingleModel(c *mistralclient.MistralClient, modelName string, modelIn
 			if len(mr.Messages) == 0 {
 				return nil, fmt.Errorf("%w: no messages provided in the model request", ErrInvalidModelInput)
 			}
-			messages := mapMessagesToMistral(mr.Messages)
+			messages, err := mapMessagesToMistral(mr.Messages)
+			if err != nil {
+				return nil, err
+			}
 
-			var formatOpt mistralclient.ChatCompletionOption
+			req := &mistral.ChatCompletionRequest{
+				CompletionConfig: *cfg,
+				Messages:         messages,
+				Model:            modelInfo.Label,
+			}
+
 			if mr.Output.Constrained && mr.Output.Format == "json" {
-				formatOpt = mistralclient.WithResponseJsonSchema(mr.Output.Schema)
+				mistral.WithResponseJsonSchema(mr.Output.Schema)(req)
 			} else {
-				formatOpt = mistralclient.WithResponseTextFormat()
+				mistral.WithResponseTextFormat()(req)
 			}
 
-			opts := []mistralclient.ChatCompletionOption{formatOpt}
 			if nbTools := len(mr.Tools); nbTools > 0 {
-				if tc := mistralclient.NewToolChoice(string(mr.ToolChoice)); tc != "" {
-					opts = append(opts, mistralclient.WithToolChoice(tc))
+				if tc := mistral.NewToolChoiceType(string(mr.ToolChoice)); tc != "" {
+					mistral.WithToolChoice(tc)(req)
 				}
 
-				tools := make([]mistralclient.ToolDefinition, 0, nbTools)
+				tools := make([]mistral.Tool, 0, nbTools)
 				for _, tool := range mr.Tools {
-					tools = append(tools, mistralclient.ToolDefinition{
-						Type: "function",
-						Function: mistralclient.ToolFunctionDefinition{
-							Name:        tool.Name,
-							Description: tool.Description,
-							Parameters:  mistralclient.MapFunctionParameters(tool.InputSchema),
-							Strict:      false,
-						},
-					})
+					tools = append(tools, mistral.NewTool(tool.Name, tool.Description, tool.InputSchema))
 				}
-				opts = append(opts, mistralclient.WithTools(tools))
+				mistral.WithTools(tools)(req)
 			}
 
-			response, err := c.Chat(modelName, messages)
+			response, err := c.ChatCompletion(ctx, req)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
@@ -78,31 +78,6 @@ func defineSingleModel(c *mistralclient.MistralClient, modelName string, modelIn
 			return mapResponse(mr, response), nil
 		},
 	)
-}
-
-func defineModel(c mistralclient.Client, modelName string, modelInfos ai.ModelInfo) []ai.Model {
-	var defined []ai.Model
-
-	defined = append(defined, defineSingleModel(c, modelName, &modelInfos))
-
-	if len(modelInfos.Versions) == 0 {
-		return defined
-	}
-
-	for _, version := range modelInfos.Versions {
-		if version == modelName {
-			continue
-		}
-		mi := &ai.ModelInfo{
-			Label:    version,
-			Stage:    modelInfos.Stage,
-			Supports: modelInfos.Supports,
-			Versions: modelInfos.Versions,
-		}
-		defined = append(defined, defineSingleModel(c, version, mi))
-	}
-
-	return defined
 }
 
 func defineFakeModel() ai.Model {
@@ -120,7 +95,7 @@ func defineFakeModel() ai.Model {
 			Versions: []string{"fake-completion"},
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			cfg, err := getConfigFromRequest(mr)
+			cfg, err := configFromRequest(mr)
 			if err != nil {
 				return nil, err
 			}
@@ -129,7 +104,7 @@ func defineFakeModel() ai.Model {
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
 
-			nbWords := calculateFakeWordCount(cfg.Temperature, cfg.MaxOutputTokens)
+			nbWords := calculateFakeWordCount(cfg.Temperature, cfg.MaxTokens)
 
 			fakeResponse, err := internal.FakeText(nbWords)
 			if err != nil {
@@ -139,21 +114,6 @@ func defineFakeModel() ai.Model {
 			return mapResponseFromText(mr, fakeResponse), nil
 		},
 	)
-}
-
-func getConfigFromRequest(mr *ai.ModelRequest) (*mistralclient.ModelConfig, error) {
-	if mr.Config == nil {
-		return &mistralclient.ModelConfig{}, nil
-	}
-	switch m := mr.Config.(type) {
-	case *mistralclient.ModelConfig:
-		return m, nil
-	case mistralclient.ModelConfig:
-		return &m, nil
-	case map[string]any:
-		return mistralclient.NewModelConfigFromRaw(m), nil
-	}
-	return nil, fmt.Errorf("invalid model request config type: expected *mistral.ModelConfig, got %T", mr.Config)
 }
 
 // calculateFakeWordCount determines the number of words to generate for the fake model response.
@@ -190,4 +150,29 @@ func calculateFakeWordCount(temperature float64, maxOutputTokens int) int {
 	words := float64(minWords) + wordCountRange*skewedRandomFactor
 
 	return int(math.Round(words))
+}
+
+func configFromRequest(req *ai.ModelRequest) (*mistral.CompletionConfig, error) {
+	var result mistral.CompletionConfig
+
+	switch config := req.Config.(type) {
+	case mistral.CompletionConfig:
+		result = config
+	case *mistral.CompletionConfig:
+		result = *config
+	case map[string]any:
+		jsonData, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(jsonData, &result); err != nil {
+			return nil, err
+		}
+	case nil:
+		// Empty but valid config
+	default:
+		return nil, fmt.Errorf("unexpected config type: %T", req.Config)
+	}
+
+	return &result, nil
 }
