@@ -486,16 +486,20 @@ func (p *Plugin) Init(ctx context.Context) []api.Action {
 	defer p.Unlock()
 
 	var actions []api.Action
+	modelSet := make(map[string]struct{})
 
 	for _, card := range mistralModels {
-		model := defineModel(p.Client, mapCardToModelInfo(card))
-		actions = append(actions, model.(api.Action))
+		if _, ok := modelSet[card.Id]; !ok {
+			if !card.IsEmbedding() {
+				model := defineModel(p.Client, mapCardToModelInfo(card))
+				actions = append(actions, model.(api.Action))
+			} else {
+				actions = append(actions, defineEmbedder(p.Client, card.Id).(api.Action))
+			}
+			modelSet[card.Id] = struct{}{}
+		}
 	}
 	actions = append(actions, defineFakeModel().(api.Action))
-
-	for _, name := range embeddingModels {
-		actions = append(actions, defineEmbedder(p.Client, name).(api.Action))
-	}
 	actions = append(actions, defineFakeEmbedder().(api.Action))
 
 	return actions

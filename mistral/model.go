@@ -10,6 +10,7 @@ import (
 
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/internal"
+	"github.com/thomas-marquis/genkit-mistral/mistral/internal/mapping"
 	"github.com/thomas-marquis/mistral-client/mistral"
 
 	"github.com/firebase/genkit/go/ai"
@@ -33,41 +34,14 @@ func defineModel(c mistral.Client, modelInfo *ai.ModelInfo) ai.Model {
 			Versions: modelInfo.Versions,
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			cfg, err := configFromRequest(mr)
+			//cfg, err := configFromRequest(mr)
+			//if err != nil {
+			//	return nil, err
+			//}
+
+			req, err := mapping.MapRequestToMistral(modelInfo.Label, mr)
 			if err != nil {
 				return nil, err
-			}
-
-			if len(mr.Messages) == 0 {
-				return nil, fmt.Errorf("%w: no messages provided in the model request", ErrInvalidModelInput)
-			}
-			messages, err := mapMessagesToMistral(mr.Messages)
-			if err != nil {
-				return nil, err
-			}
-
-			req := &mistral.ChatCompletionRequest{
-				CompletionConfig: *cfg,
-				Messages:         messages,
-				Model:            modelInfo.Label,
-			}
-
-			if mr.Output.Constrained && mr.Output.Format == "json" {
-				mistral.WithResponseJsonSchema(mr.Output.Schema)(req)
-			} else {
-				mistral.WithResponseTextFormat()(req)
-			}
-
-			if nbTools := len(mr.Tools); nbTools > 0 {
-				if tc := mistral.NewToolChoiceType(string(mr.ToolChoice)); tc != "" {
-					mistral.WithToolChoice(tc)(req)
-				}
-
-				tools := make([]mistral.Tool, 0, nbTools)
-				for _, tool := range mr.Tools {
-					tools = append(tools, mistral.NewTool(tool.Name, tool.Description, tool.InputSchema))
-				}
-				mistral.WithTools(tools)(req)
 			}
 
 			response, err := c.ChatCompletion(ctx, req)
@@ -75,7 +49,12 @@ func defineModel(c mistral.Client, modelInfo *ai.ModelInfo) ai.Model {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
 
-			return mapResponse(mr, response), nil
+			mresp, err := mapping.MapToGenkitResponse(mr, response)
+			if err != nil {
+				return nil, err
+			}
+
+			return mresp, nil
 		},
 	)
 }

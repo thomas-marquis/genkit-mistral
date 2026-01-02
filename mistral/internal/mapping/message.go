@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/thomas-marquis/mistral-client/mistral"
@@ -63,13 +62,13 @@ func mapMessageContent(parts []*ai.Part) (mistral.ContentChunks, error) {
 	return content, nil
 }
 
-func MapToMistralMessage(msg *ai.Message) (mistral.ChatMessage, error) {
+func MapToMistralMessage(msg *ai.Message) ([]mistral.ChatMessage, error) {
 	role, err := MapToMistralRole(msg.Role)
 	if err != nil {
 		return nil, err
 	}
 
-	var m mistral.ChatMessage
+	var m []mistral.ChatMessage
 	switch role {
 	case mistral.RoleUser:
 		if isContentOnlyText(msg.Content) {
@@ -77,13 +76,13 @@ func MapToMistralMessage(msg *ai.Message) (mistral.ChatMessage, error) {
 			if err != nil {
 				return nil, err
 			}
-			m = mistral.NewUserMessageFromString(strContent)
+			m = append(m, mistral.NewUserMessageFromString(strContent))
 		} else {
 			content, err := mapMessageContent(msg.Content)
 			if err != nil {
 				return nil, err
 			}
-			m = mistral.NewUserMessage(content)
+			m = append(m, mistral.NewUserMessage(content))
 		}
 
 	case mistral.RoleAssistant:
@@ -107,18 +106,18 @@ func MapToMistralMessage(msg *ai.Message) (mistral.ChatMessage, error) {
 					mistral.NewToolCall(part.ToolRequest.Ref, i, part.ToolRequest.Name, part.ToolRequest.Input))
 			}
 		}
-		m = assMsg
+		m = append(m, assMsg)
 	case mistral.RoleSystem:
 		content, err := StringFromParts(msg.Content)
 		if err != nil {
 			return nil, err
 		}
-		m = mistral.NewSystemMessageFromString(content)
+		m = append(m, mistral.NewSystemMessageFromString(content))
 
 	case mistral.RoleTool:
-		cb := strings.Builder{}
-		var functionName, refId string
-		var otherChunks mistral.ContentChunks
+		//cb := strings.Builder{}
+		//var functionName, refId string
+		//var otherChunks mistral.ContentChunks
 
 		for _, part := range msg.Content {
 			if part.Kind == ai.PartToolResponse {
@@ -126,25 +125,27 @@ func MapToMistralMessage(msg *ai.Message) (mistral.ChatMessage, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool response output: %w", err)
 				}
-				cb.WriteString(string(outputBytes))
-				cb.WriteString("\n")
-				functionName = part.ToolResponse.Name
-				refId = part.ToolResponse.Ref
+				m = append(m, mistral.NewToolMessage(
+					part.ToolResponse.Name, part.ToolResponse.Ref, mistral.ContentString(outputBytes)))
+				//cb.WriteString(string(outputBytes))
+				//cb.WriteString("\n")
+				//functionName = part.ToolResponse.Name
+				//refId = part.ToolResponse.Ref
 				// TODO: is it possible to have multiple tool responses with different names and refs?
 			}
 		}
 
-		otherChunks, err = mapMessageContent(msg.Content)
-
-		if functionName != "" && refId != "" {
-			toolsContent := cb.String()
-			if len(otherChunks) == 0 {
-				m = mistral.NewToolMessage(functionName, refId, mistral.ContentString(toolsContent))
-			} else {
-				m = mistral.NewToolMessage(functionName, refId,
-					append(mistral.ContentChunks{mistral.NewTextContent(toolsContent)}, otherChunks...))
-			}
-		}
+		//otherChunks, err = mapMessageContent(msg.Content)
+		//
+		//if functionName != "" && refId != "" {
+		//	toolsContent := cb.String()
+		//	if len(otherChunks) == 0 {
+		//		m = append(m, mistral.NewToolMessage(functionName, refId, mistral.ContentString(toolsContent)))
+		//	} else {
+		//		m = append(m, mistral.NewToolMessage(functionName, refId,
+		//			append(mistral.ContentChunks{mistral.NewTextContent(toolsContent)}, otherChunks...)))
+		//	}
+		//}
 	}
 
 	return m, nil

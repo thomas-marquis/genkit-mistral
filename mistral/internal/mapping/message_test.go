@@ -28,10 +28,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleUser, res.Role())
 			assert.Equal(t, "Hello\nWorld!", res.Content().String())
@@ -49,10 +51,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleUser, res.Role())
 
@@ -94,10 +98,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleSystem, res.Role())
 			assert.Equal(t, "Hello\nWorld!", res.Content().String())
@@ -122,10 +128,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleAssistant, res.Role())
 			assert.Equal(t, "Hello\nWorld!", res.Content().String())
@@ -143,10 +151,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleAssistant, res.Role())
 
@@ -194,10 +204,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleAssistant, res.Role())
 			assert.Empty(t, res.Content().String())
@@ -218,7 +230,7 @@ func TestMapToMistralMessage(t *testing.T) {
 		})
 	})
 
-	t.Run("should map as an tool message", func(t *testing.T) {
+	t.Run("should map as a tool message", func(t *testing.T) {
 		t.Run("with tool response content", func(t *testing.T) {
 			// Given
 			genkitMsg := &ai.Message{
@@ -235,10 +247,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleTool, res.Role())
 
@@ -248,6 +262,85 @@ func TestMapToMistralMessage(t *testing.T) {
 			assert.JSONEq(t, `{
 				"result": 12
 			}`, toolMsg.Content().String())
+		})
+
+		t.Run("with multiple tool responses", func(t *testing.T) {
+			// Given
+			genkitMsg := &ai.Message{
+				Role: ai.RoleTool,
+				Content: []*ai.Part{
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name: "add",
+						Ref:  "ref1",
+						Output: map[string]interface{}{
+							"result": 12,
+						},
+					}),
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name: "add",
+						Ref:  "ref2",
+						Output: map[string]interface{}{
+							"result": 33,
+						},
+					}),
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name: "add",
+						Ref:  "ref3",
+						Output: map[string]interface{}{
+							"result": 90,
+						},
+					}),
+					ai.NewToolResponsePart(&ai.ToolResponse{
+						Name: "inc",
+						Ref:  "ref4",
+					}),
+				},
+			}
+
+			// When
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
+
+			// Then
+			assert.NoError(t, err)
+			assert.Equal(t, 4, len(messages))
+
+			res := messages[0]
+			assert.NotNil(t, res)
+			assert.Equal(t, mistral.RoleTool, res.Role())
+			toolMsg := res.(*mistral.ToolMessage)
+			assert.Equal(t, "ref1", toolMsg.ToolCallId)
+			assert.Equal(t, "add", toolMsg.Name)
+			assert.JSONEq(t, `{
+				"result": 12
+			}`, toolMsg.Content().String())
+
+			res = messages[1]
+			assert.NotNil(t, res)
+			assert.Equal(t, mistral.RoleTool, res.Role())
+			toolMsg = res.(*mistral.ToolMessage)
+			assert.Equal(t, "ref2", toolMsg.ToolCallId)
+			assert.Equal(t, "add", toolMsg.Name)
+			assert.JSONEq(t, `{
+				"result": 33
+			}`, toolMsg.Content().String())
+
+			res = messages[2]
+			assert.NotNil(t, res)
+			assert.Equal(t, mistral.RoleTool, res.Role())
+			toolMsg = res.(*mistral.ToolMessage)
+			assert.Equal(t, "ref3", toolMsg.ToolCallId)
+			assert.Equal(t, "add", toolMsg.Name)
+			assert.JSONEq(t, `{
+				"result": 90
+			}`, toolMsg.Content().String())
+
+			res = messages[3]
+			assert.NotNil(t, res)
+			assert.Equal(t, mistral.RoleTool, res.Role())
+			toolMsg = res.(*mistral.ToolMessage)
+			assert.Equal(t, "ref4", toolMsg.ToolCallId)
+			assert.Equal(t, "inc", toolMsg.Name)
+			assert.Equal(t, "null", toolMsg.Content().String())
 		})
 
 		t.Run("with tool response and other text contents", func(t *testing.T) {
@@ -267,10 +360,12 @@ func TestMapToMistralMessage(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapToMistralMessage(genkitMsg)
+			messages, err := mapping.MapToMistralMessage(genkitMsg)
 
 			// Then
 			assert.NoError(t, err)
+			assert.Equal(t, 1, len(messages))
+			res := messages[0]
 			assert.NotNil(t, res)
 			assert.Equal(t, mistral.RoleTool, res.Role())
 
