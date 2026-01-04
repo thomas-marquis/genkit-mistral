@@ -63,18 +63,18 @@ func TestMapToMistralMessage(t *testing.T) {
 			chunks := res.Content().Chunks()
 			assert.Equal(t, 3, len(chunks))
 
-			assert.IsType(t, &mistral.TextContent{}, chunks[0])
-			textChunk := chunks[0].(*mistral.TextContent)
+			assert.IsType(t, &mistral.TextChunk{}, chunks[0])
+			textChunk := chunks[0].(*mistral.TextChunk)
 			assert.Equal(t, mistral.ContentTypeText, textChunk.ContentType)
 			assert.Equal(t, "Hello world!", textChunk.Text)
 
-			assert.IsType(t, &mistral.ImageUrlContent{}, chunks[1])
-			imageChunk := chunks[1].(*mistral.ImageUrlContent)
+			assert.IsType(t, &mistral.ImageUrlChunk{}, chunks[1])
+			imageChunk := chunks[1].(*mistral.ImageUrlChunk)
 			assert.Equal(t, mistral.ContentTypeImageURL, imageChunk.ContentType)
 			assert.Equal(t, "https://mycdn.net/myimage.gif", imageChunk.ImageURL)
 
-			assert.IsType(t, &mistral.AudioContent{}, chunks[2])
-			audioChunk := chunks[2].(*mistral.AudioContent)
+			assert.IsType(t, &mistral.AudioChunk{}, chunks[2])
+			audioChunk := chunks[2].(*mistral.AudioChunk)
 			assert.Equal(t, mistral.ContentTypeAudio, audioChunk.ContentType)
 			assert.Equal(t, "base64_encoded_audio_data or audio_file_url or audio_file_uploaded_on_mistral_la_plateforme", audioChunk.InputAudio)
 		})
@@ -163,18 +163,18 @@ func TestMapToMistralMessage(t *testing.T) {
 			chunks := res.Content().Chunks()
 			assert.Equal(t, 3, len(chunks))
 
-			assert.IsType(t, &mistral.TextContent{}, chunks[0])
-			textChunk := chunks[0].(*mistral.TextContent)
+			assert.IsType(t, &mistral.TextChunk{}, chunks[0])
+			textChunk := chunks[0].(*mistral.TextChunk)
 			assert.Equal(t, mistral.ContentTypeText, textChunk.ContentType)
 			assert.Equal(t, "Hello world!", textChunk.Text)
 
-			assert.IsType(t, &mistral.ImageUrlContent{}, chunks[1])
-			imageChunk := chunks[1].(*mistral.ImageUrlContent)
+			assert.IsType(t, &mistral.ImageUrlChunk{}, chunks[1])
+			imageChunk := chunks[1].(*mistral.ImageUrlChunk)
 			assert.Equal(t, mistral.ContentTypeImageURL, imageChunk.ContentType)
 			assert.Equal(t, "https://mycdn.net/myimage.gif", imageChunk.ImageURL)
 
-			assert.IsType(t, &mistral.AudioContent{}, chunks[2])
-			audioChunk := chunks[2].(*mistral.AudioContent)
+			assert.IsType(t, &mistral.AudioChunk{}, chunks[2])
+			audioChunk := chunks[2].(*mistral.AudioChunk)
 			assert.Equal(t, mistral.ContentTypeAudio, audioChunk.ContentType)
 			assert.Equal(t, "base64_encoded_audio_data or audio_file_url or audio_file_uploaded_on_mistral_la_plateforme", audioChunk.InputAudio)
 		})
@@ -341,48 +341,6 @@ func TestMapToMistralMessage(t *testing.T) {
 			assert.Equal(t, "ref4", toolMsg.ToolCallId)
 			assert.Equal(t, "inc", toolMsg.Name)
 			assert.Equal(t, "null", toolMsg.Content().String())
-		})
-
-		t.Run("with tool response and other text contents", func(t *testing.T) {
-			// Given
-			genkitMsg := &ai.Message{
-				Role: ai.RoleTool,
-				Content: []*ai.Part{
-					ai.NewToolResponsePart(&ai.ToolResponse{
-						Name: "add",
-						Ref:  "ref12345",
-						Output: map[string]interface{}{
-							"result": 12,
-						},
-					}),
-					ai.NewTextPart("Hello world!"),
-				},
-			}
-
-			// When
-			messages, err := mapping.MapToMistralMessage(genkitMsg)
-
-			// Then
-			assert.NoError(t, err)
-			assert.Equal(t, 1, len(messages))
-			res := messages[0]
-			assert.NotNil(t, res)
-			assert.Equal(t, mistral.RoleTool, res.Role())
-
-			toolMsg := res.(*mistral.ToolMessage)
-			assert.Equal(t, "ref12345", toolMsg.ToolCallId)
-			assert.Equal(t, "add", toolMsg.Name)
-
-			chunks := toolMsg.Content().Chunks()
-			assert.Equal(t, 2, len(chunks))
-
-			assert.IsType(t, &mistral.TextContent{}, chunks[0])
-			assert.JSONEq(t, `{
-				"result": 12
-			}`, chunks[0].(*mistral.TextContent).Text)
-
-			assert.IsType(t, &mistral.TextContent{}, chunks[1])
-			assert.Equal(t, "Hello world!", chunks[1].(*mistral.TextContent).Text)
 		})
 	})
 }

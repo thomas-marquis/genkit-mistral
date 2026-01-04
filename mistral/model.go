@@ -3,6 +3,7 @@ package mistral
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -34,13 +35,11 @@ func defineModel(c mistral.Client, modelInfo *ai.ModelInfo) ai.Model {
 			Versions: modelInfo.Versions,
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			//cfg, err := configFromRequest(mr)
-			//if err != nil {
-			//	return nil, err
-			//}
-
-			req, err := mapping.MapRequestToMistral(modelInfo.Label, mr)
+			req, err := mapping.MapRequestToMistral(modelInfo.Label, mr) // TODO: map completion config too
 			if err != nil {
+				if errors.Is(err, mapping.ErrNoMessages) {
+					return nil, errors.Join(ErrInvalidModelInput, err)
+				}
 				return nil, err
 			}
 

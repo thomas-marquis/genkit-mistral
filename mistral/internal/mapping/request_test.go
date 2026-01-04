@@ -55,10 +55,10 @@ func TestMapRequestToMistral(t *testing.T) {
 		assert.Equal(t, 2, len(chunks))
 
 		assert.Equal(t, mistral.ContentTypeAudio, chunks[0].Type())
-		assert.Equal(t, "base64_encoded_audio_data", chunks[0].(*mistral.AudioContent).InputAudio)
+		assert.Equal(t, "base64_encoded_audio_data", chunks[0].(*mistral.AudioChunk).InputAudio)
 
 		assert.Equal(t, mistral.ContentTypeText, chunks[1].Type())
-		assert.Equal(t, "Please transcribe this", chunks[1].(*mistral.TextContent).Text)
+		assert.Equal(t, "Please transcribe this", chunks[1].(*mistral.TextChunk).Text)
 	})
 
 	for _, tc := range []struct {

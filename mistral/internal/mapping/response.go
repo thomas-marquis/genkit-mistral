@@ -40,7 +40,7 @@ func MapToGenkitResponse(mr *ai.ModelRequest, resp *mistral.ChatCompletionRespon
 		for _, chunk := range cnt.Chunks() {
 			switch chunk.Type() {
 			case mistral.ContentTypeText:
-				parts = append(parts, ai.NewTextPart(chunk.(*mistral.TextContent).Text))
+				parts = append(parts, ai.NewTextPart(chunk.(*mistral.TextChunk).Text))
 			}
 		}
 	}

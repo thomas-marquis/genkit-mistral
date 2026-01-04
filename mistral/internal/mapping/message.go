@@ -47,12 +47,12 @@ func mapMessageContent(parts []*ai.Part) (mistral.ContentChunks, error) {
 	for _, part := range parts {
 		switch part.Kind {
 		case ai.PartText:
-			content = append(content, mistral.NewTextContent(part.Text))
+			content = append(content, mistral.NewTextChunk(part.Text))
 		case ai.PartMedia:
 			if part.IsImage() {
-				content = append(content, mistral.NewImageUrlContent(part.Text))
+				content = append(content, mistral.NewImageUrlChunk(part.Text))
 			} else if part.IsAudio() {
-				content = append(content, mistral.NewAudioContent(part.Text))
+				content = append(content, mistral.NewAudioChunk(part.Text))
 			} else {
 				logger.Printf("Unsupported media type: %s\n", part.ContentType)
 			}

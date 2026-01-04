@@ -1,14 +1,15 @@
 package mapping
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/thomas-marquis/mistral-client/mistral"
 )
 
 var (
-	ErrNoModelProvided = fmt.Errorf("model name is empty")
+	ErrNoModelProvided = errors.New("model name is empty")
+	ErrNoMessages      = errors.New("message list is empty")
 )
 
 func MapRequestToMistral(model string, mr *ai.ModelRequest) (*mistral.ChatCompletionRequest, error) {
@@ -16,7 +17,7 @@ func MapRequestToMistral(model string, mr *ai.ModelRequest) (*mistral.ChatComple
 		return nil, ErrNoModelProvided
 	}
 	if len(mr.Messages) == 0 {
-		return nil, fmt.Errorf("message list is empty")
+		return nil, ErrNoMessages
 	}
 
 	messages := make([]mistral.ChatMessage, 0, len(mr.Messages))
