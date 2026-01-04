@@ -37,6 +37,59 @@ func (r Recipe) String() string {
 	return sb.String()
 }
 
+type GroceryList struct {
+	sync.Mutex
+	indexedList  map[int]string
+	currentIndex int
+}
+
+func NewGroceryList() *GroceryList {
+	return &GroceryList{
+		indexedList:  make(map[int]string),
+		currentIndex: 100,
+	}
+}
+
+func (g *GroceryList) Add(item string) int {
+	g.Lock()
+	defer g.Unlock()
+	g.indexedList[g.currentIndex] = item
+	g.currentIndex++
+	return g.currentIndex - 1
+}
+
+func (g *GroceryList) Update(id int, item string) error {
+	g.Lock()
+	defer g.Unlock()
+	if _, ok := g.indexedList[id]; !ok {
+		return fmt.Errorf("item with ID %d not found", id)
+	}
+	g.indexedList[id] = item
+	return nil
+}
+
+func (g *GroceryList) Delete(id int) error {
+	g.Lock()
+	defer g.Unlock()
+	if _, ok := g.indexedList[id]; !ok {
+		return fmt.Errorf("item with ID %d not found", id)
+	}
+	delete(g.indexedList, id)
+	return nil
+}
+
+func (g *GroceryList) Len() int {
+	return len(g.indexedList)
+}
+
+func (g *GroceryList) String() string {
+	sb := strings.Builder{}
+	for id, item := range g.indexedList {
+		sb.WriteString(fmt.Sprintf("- ID=%d ; Item=%s\n", id, item))
+	}
+	return sb.String()
+}
+
 func main() {
 	apiKey := os.Getenv("MISTRAL_API_KEY")
 	if apiKey == "" {
@@ -54,7 +107,7 @@ func main() {
 		}),
 		ai.WithModelName("mistral/mistral-small-latest"),
 		ai.WithPrompt(`Create a complete recipe according to the following instructions:
-		{{instructions}}`))
+{{instructions}}`))
 
 	createRecipe := genkit.DefineFlow(g, "recipeCreator", func(ctx context.Context, in string) (Recipe, error) {
 		var recipe Recipe
@@ -72,26 +125,14 @@ func main() {
 		return recipe, nil
 	})
 
-	groceryList := struct {
-		sync.Mutex
-		indexedList map[int]string
-		lastIndex   int
-	}{
-		indexedList: make(map[int]string),
-	}
+	groceryList := NewGroceryList()
 
 	genkit.DefineTool(g, "groceryListGet", "get the current content of the list", func(ctx *ai.ToolContext, input any) (string, error) {
-		if len(groceryList.indexedList) == 0 {
+		fmt.Println("groceryListGet")
+		if groceryList.Len() == 0 {
 			return "The list is empty", nil
 		}
-		rendered := strings.Builder{}
-		for i, item := range groceryList.indexedList {
-			rendered.WriteString("- ")
-			rendered.WriteString(fmt.Sprint(i + 1))
-			rendered.WriteString(item)
-			rendered.WriteString("\n")
-		}
-		return rendered.String(), nil
+		return groceryList.String(), nil
 	})
 
 	type groceryListAddInput struct {
@@ -100,44 +141,46 @@ func main() {
 
 	genkit.DefineTool(g, "groceryListAdd", "add an item to the list", func(ctx *ai.ToolContext, input groceryListAddInput) (string, error) {
 		fmt.Printf("groceryListAdd: %s\n", input.Item)
-		groceryList.Lock()
-		defer groceryList.Unlock()
-		groceryList.indexedList[groceryList.lastIndex+1] = input.Item
-		groceryList.lastIndex++
-		return fmt.Sprintf("Item %d added to the list", groceryList.lastIndex), nil
+		groceryList.Add(input.Item)
+		return "ok", nil
 	})
 
 	type groceryListDeleteInput struct {
-		Index int `jsonschema_description:"The index of the item to remove from the list"`
+		ID int `jsonschema_description:"The ID of the item to remove from the list"`
 	}
 
 	genkit.DefineTool(g, "groceryListDelete", "remove an item from the grocery list", func(ctx *ai.ToolContext, input groceryListDeleteInput) (string, error) {
-		fmt.Printf("groceryListDelete: %d\n", input.Index)
-		groceryList.Lock()
-		defer groceryList.Unlock()
-		delete(groceryList.indexedList, input.Index)
-		return fmt.Sprintf("Item %d removed from the list", input.Index), nil
+		fmt.Printf("groceryListDelete: %d\n", input.ID)
+		if err := groceryList.Delete(input.ID); err != nil {
+			return "", err
+		}
+		return "ok", nil
 	})
 
 	type groceryListUpdateInput struct {
-		Index int    `jsonschema_description:"The index of the item to update in the list"`
-		Item  string `jsonschema_description:"The new item to replace the old one with the updated label and/or quantity indication"`
+		ID          int    `jsonschema_description:"The ID of the item to update in the list"`
+		UpdatedItem string `jsonschema_description:"The new item to replace the old one with the updated label and/or quantity indication"`
 	}
 
 	genkit.DefineTool(g, "groceryListUpdate", "update an item in the grocery list", func(ctx *ai.ToolContext, input groceryListUpdateInput) (string, error) {
-		fmt.Printf("groceryListUpdate: %d %s\n", input.Index, input.Item)
-		groceryList.Lock()
-		defer groceryList.Unlock()
-		groceryList.indexedList[input.Index] = input.Item
-		return fmt.Sprintf("Item %d updated in the list", input.Index), nil
+		fmt.Printf("groceryListUpdate: %d %s\n", input.ID, input.UpdatedItem)
+		if err := groceryList.Update(input.ID, input.UpdatedItem); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("UpdatedItem %d updated in the list", input.ID), nil
 	})
 
 	genkit.DefinePrompt(g, "groceryListPrompt",
 		ai.WithSystem(`You are a grocery list manager. Your role is to keep it as clean and coherent as possible. 
-		Avoid duplication and ensure you don't forget any item on the list.`),
+Instructions:
+- Avoid duplication: if an item already exists in the list, update it instead of adding a new one.
+- Get the list content times to times
+- Ensure you don't forget any item on the list.
+- Use this format for list items: "<label>, <quantity>"
+- Avoid recipe-related comment in the list item label, keep it simple`),
 		ai.WithPrompt(`Add or update the grocery list with the following items:
-		{{#each items}}- {{this}}{{/each}}
-		`),
+{{#each items}}- {{this}}{{/each}}
+`),
 		ai.WithModelName("mistral/mistral-medium-latest"),
 		ai.WithConfig(mistralclient.CompletionConfig{
 			Temperature:       0.1,
@@ -165,13 +208,55 @@ func main() {
 		return res.Text(), nil
 	})
 
-	menuPlannerFlow := genkit.DefineFlow(g, "menuPlannerFlow", func(ctx context.Context, in []string) (string, error) {
-		for _, menu := range in {
+	genkit.DefinePrompt(g, "menuPrompt",
+		ai.WithModelName("mistral/mistral-small-latest"),
+		ai.WithConfig(mistralclient.CompletionConfig{
+			Temperature: 0.7,
+		}),
+		ai.WithSystem(`You are a menu planner for an individual. Just give a list of courses without any details according the the constraints given by the user.
+Don't create the full recipe, just a short description of the meal. Examples:
+- Grilled Salmon with Quinoa and Steamed Broccoli
+- Chickpea and Spinach Curry with Brown Rice
+- Stuffed Bell Peppers with Lean Turkey and Quinoa
+
+Respect the number of meal to create given by the user.
+'
+`),
+		ai.WithPrompt(`Create a {{nb}}-meals menu that respect this constraint: {{constraint}}`),
+		ai.WithOutputType([]string{}))
+
+	type menuPlannerInput struct {
+		NbMeals    int    `jsonschema_description:"The number of meals to create"`
+		Constraint string `jsonschema_description:"The constraint to respect"`
+	}
+
+	menuPlannerFlow := genkit.DefineFlow(g, "menuPlannerFlow", func(ctx context.Context, in menuPlannerInput) (string, error) {
+		menuRes, err := genkit.LookupPrompt(g, "menuPrompt").Execute(ctx,
+			ai.WithInput(map[string]interface{}{
+				"nb":         in.NbMeals,
+				"constraint": in.Constraint,
+			}))
+		if err != nil {
+			return "", err
+		}
+		var menus []string
+		if err := menuRes.Output(&menus); err != nil {
+			return "", err
+		}
+
+		fmt.Println("Menus to create:")
+		for _, m := range menus {
+			fmt.Println(m)
+		}
+
+		for _, menu := range menus {
+			fmt.Println("Creating recipe for menu:", menu)
 			recipe, err := createRecipe.Run(ctx, menu)
 			if err != nil {
 				return "", err
 			}
 			fmt.Println(recipe.String())
+			fmt.Println(groceryList.String())
 			res, err := groceryListManagerFlow.Run(ctx, recipe.Ingredients)
 			if err != nil {
 				return "", err
@@ -183,9 +268,9 @@ func main() {
 	})
 
 	res, err := menuPlannerFlow.Run(ctx,
-		[]string{
-			"Make a pizza with cheese and tomatoes",
-			"Make a salad with lettuce and tomatoes",
+		menuPlannerInput{
+			NbMeals:    2,
+			Constraint: "something healthy for the winter",
 		})
 
 	if err != nil {
@@ -194,7 +279,5 @@ func main() {
 	fmt.Printf("%s\n", res)
 
 	fmt.Println("# Current grocery list:")
-	for _, item := range groceryList.indexedList {
-		fmt.Println(item)
-	}
+	fmt.Println(groceryList.String())
 }
