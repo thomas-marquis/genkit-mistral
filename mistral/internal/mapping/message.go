@@ -25,7 +25,7 @@ func StringFromParts(content []*ai.Part) (string, error) {
 				msg += "\n"
 			}
 		} else {
-			return "", fmt.Errorf("Unexpected message content part: %v\n", part)
+			return "", fmt.Errorf("unexpected message content part: %v", part)
 		}
 	}
 
