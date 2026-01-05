@@ -1,6 +1,6 @@
 module github.com/thomas-marquis/genkit-mistral
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/firebase/genkit/go v1.2.0
