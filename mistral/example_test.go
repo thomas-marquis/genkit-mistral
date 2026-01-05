@@ -15,7 +15,9 @@ func ExampleNewPlugin_initPluginAndGenerateText() {
 	ctx := context.Background()
 	g := genkit.Init(ctx,
 		genkit.WithPlugins(
-			mistral.NewPlugin(mistralApiKey),
+			mistral.NewPlugin(mistralApiKey,
+				mistral.WithAPICallsDisabled(), // required for this example, don't use this option in production
+			),
 		),
 		genkit.WithDefaultModel("mistral/fake-completion"),
 	)
@@ -43,7 +45,9 @@ func ExampleNewPlugin_underConstraintTextGenerationWithAMockedModel() {
 	ctx := context.Background()
 	g := genkit.Init(ctx,
 		genkit.WithPlugins(
-			mistral.NewPlugin(mistralApiKey),
+			mistral.NewPlugin(mistralApiKey,
+				mistral.WithAPICallsDisabled(), // required for this example, don't use this option in production
+			),
 		),
 		genkit.WithDefaultModel("mistral/fake-completion"),
 	)
@@ -94,7 +98,9 @@ func ExampleNewPlugin_initPluginAndComputeAnEmbedding() {
 	ctx := context.Background()
 	g := genkit.Init(ctx,
 		genkit.WithPlugins(
-			mistral.NewPlugin(mistralApiKey),
+			mistral.NewPlugin(mistralApiKey,
+				mistral.WithAPICallsDisabled(), // required for this example, don't use this option in production
+			),
 		),
 	)
 

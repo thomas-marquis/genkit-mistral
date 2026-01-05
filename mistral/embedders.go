@@ -9,7 +9,7 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/internal"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
+	"github.com/thomas-marquis/mistral-client/mistral"
 )
 
 const (
@@ -30,7 +30,7 @@ func newEmbeddingOptionsFromRaw(r map[string]any) *EmbeddingOptions {
 	}
 }
 
-func defineEmbedder(client mistralclient.Client, modelName string) ai.Embedder {
+func defineEmbedder(client mistral.Client, modelName string) ai.Embedder {
 	return ai.NewEmbedder(
 		api.NewName(providerID, modelName),
 		&ai.EmbedderOptions{},
@@ -44,7 +44,8 @@ func defineEmbedder(client mistralclient.Client, modelName string) ai.Embedder {
 				texts[i] = StringFromParts(input.Content)
 			}
 
-			embResp, err := client.TextEmbedding(ctx, texts, modelName)
+			req := mistral.NewEmbeddingRequest(modelName, texts)
+			embResp, err := client.Embeddings(ctx, req)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get embedding: %w", err)
 			}

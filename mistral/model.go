@@ -2,6 +2,8 @@ package mistral
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -9,7 +11,8 @@ import (
 
 	"github.com/firebase/genkit/go/core/api"
 	"github.com/thomas-marquis/genkit-mistral/internal"
-	"github.com/thomas-marquis/genkit-mistral/mistralclient"
+	"github.com/thomas-marquis/genkit-mistral/mistral/internal/mapping"
+	"github.com/thomas-marquis/mistral-client/mistral"
 
 	"github.com/firebase/genkit/go/ai"
 )
@@ -22,9 +25,9 @@ var (
 	ErrInvalidModelInput = fmt.Errorf("invalid model input")
 )
 
-func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.ModelInfo) ai.Model {
+func defineModel(c mistral.Client, modelInfo *ai.ModelInfo) ai.Model {
 	return ai.NewModel(
-		api.NewName(providerID, modelName),
+		api.NewName(providerID, modelInfo.Label),
 		&ai.ModelOptions{
 			Label:    modelInfo.Label,
 			Stage:    modelInfo.Stage,
@@ -32,77 +35,32 @@ func defineSingleModel(c mistralclient.Client, modelName string, modelInfo *ai.M
 			Versions: modelInfo.Versions,
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			cfg, err := getConfigFromRequest(mr)
+			cfg, err := configFromRequest(mr)
 			if err != nil {
 				return nil, err
 			}
 
-			if len(mr.Messages) == 0 {
-				return nil, fmt.Errorf("%w: no messages provided in the model request", ErrInvalidModelInput)
-			}
-			messages := mapMessagesToMistral(mr.Messages)
-
-			var formatOpt mistralclient.ChatCompletionOption
-			if mr.Output.Constrained && mr.Output.Format == "json" {
-				formatOpt = mistralclient.WithResponseJsonSchema(mr.Output.Schema)
-			} else {
-				formatOpt = mistralclient.WithResponseTextFormat()
-			}
-
-			opts := []mistralclient.ChatCompletionOption{formatOpt}
-			if nbTools := len(mr.Tools); nbTools > 0 {
-				if tc := mistralclient.NewToolChoice(string(mr.ToolChoice)); tc != "" {
-					opts = append(opts, mistralclient.WithToolChoice(tc))
+			req, err := mapping.MapRequestToMistral(modelInfo.Label, mr, cfg)
+			if err != nil {
+				if errors.Is(err, mapping.ErrNoMessages) {
+					return nil, errors.Join(ErrInvalidModelInput, err)
 				}
-
-				tools := make([]mistralclient.ToolDefinition, 0, nbTools)
-				for _, tool := range mr.Tools {
-					tools = append(tools, mistralclient.ToolDefinition{
-						Type: "function",
-						Function: mistralclient.ToolFunctionDefinition{
-							Name:        tool.Name,
-							Description: tool.Description,
-							Parameters:  tool.InputSchema,
-							Strict:      false,
-						},
-					})
-				}
-				opts = append(opts, mistralclient.WithTools(tools))
+				return nil, err
 			}
 
-			response, err := c.ChatCompletion(ctx, messages, modelName, cfg, opts...)
+			response, err := c.ChatCompletion(ctx, req)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get chat completion: %w", err)
 			}
 
-			return mapResponse(mr, response), nil
+			mresp, err := mapping.MapToGenkitResponse(mr, response)
+			if err != nil {
+				return nil, err
+			}
+
+			return mresp, nil
 		},
 	)
-}
-
-func defineModel(c mistralclient.Client, modelName string, modelInfos ai.ModelInfo) []ai.Model {
-	var defined []ai.Model
-
-	defined = append(defined, defineSingleModel(c, modelName, &modelInfos))
-
-	if len(modelInfos.Versions) == 0 {
-		return defined
-	}
-
-	for _, version := range modelInfos.Versions {
-		if version == modelName {
-			continue
-		}
-		mi := &ai.ModelInfo{
-			Label:    version,
-			Stage:    modelInfos.Stage,
-			Supports: modelInfos.Supports,
-			Versions: modelInfos.Versions,
-		}
-		defined = append(defined, defineSingleModel(c, version, mi))
-	}
-
-	return defined
 }
 
 func defineFakeModel() ai.Model {
@@ -120,7 +78,7 @@ func defineFakeModel() ai.Model {
 			Versions: []string{"fake-completion"},
 		},
 		func(ctx context.Context, mr *ai.ModelRequest, cb ai.ModelStreamCallback) (*ai.ModelResponse, error) {
-			cfg, err := getConfigFromRequest(mr)
+			cfg, err := configFromRequest(mr)
 			if err != nil {
 				return nil, err
 			}
@@ -129,7 +87,7 @@ func defineFakeModel() ai.Model {
 				return nil, fmt.Errorf("no messages provided in the model request")
 			}
 
-			nbWords := calculateFakeWordCount(cfg.Temperature, cfg.MaxOutputTokens)
+			nbWords := calculateFakeWordCount(cfg.Temperature, cfg.MaxTokens)
 
 			fakeResponse, err := internal.FakeText(nbWords)
 			if err != nil {
@@ -139,21 +97,6 @@ func defineFakeModel() ai.Model {
 			return mapResponseFromText(mr, fakeResponse), nil
 		},
 	)
-}
-
-func getConfigFromRequest(mr *ai.ModelRequest) (*mistralclient.ModelConfig, error) {
-	if mr.Config == nil {
-		return &mistralclient.ModelConfig{}, nil
-	}
-	switch m := mr.Config.(type) {
-	case *mistralclient.ModelConfig:
-		return m, nil
-	case mistralclient.ModelConfig:
-		return &m, nil
-	case map[string]any:
-		return mistralclient.NewModelConfigFromRaw(m), nil
-	}
-	return nil, fmt.Errorf("invalid model request config type: expected *mistral.ModelConfig, got %T", mr.Config)
 }
 
 // calculateFakeWordCount determines the number of words to generate for the fake model response.
@@ -190,4 +133,29 @@ func calculateFakeWordCount(temperature float64, maxOutputTokens int) int {
 	words := float64(minWords) + wordCountRange*skewedRandomFactor
 
 	return int(math.Round(words))
+}
+
+func configFromRequest(req *ai.ModelRequest) (*mistral.CompletionConfig, error) {
+	var result mistral.CompletionConfig
+
+	switch config := req.Config.(type) {
+	case mistral.CompletionConfig:
+		result = config
+	case *mistral.CompletionConfig:
+		result = *config
+	case map[string]any:
+		jsonData, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(jsonData, &result); err != nil {
+			return nil, err
+		}
+	case nil:
+		// Empty but valid config
+	default:
+		return nil, fmt.Errorf("unexpected config type: %T", req.Config)
+	}
+
+	return &result, nil
 }
