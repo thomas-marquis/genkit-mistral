@@ -38,7 +38,7 @@ func TestMapRequestToMistral(t *testing.T) {
 		}
 
 		// When
-		res, err := mapping.MapRequestToMistral("mistral-small-latest", mr)
+		res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, nil)
 
 		// Then
 		assert.NoError(t, err)
@@ -59,6 +59,55 @@ func TestMapRequestToMistral(t *testing.T) {
 
 		assert.Equal(t, mistral.ContentTypeText, chunks[1].Type())
 		assert.Equal(t, "Please transcribe this", chunks[1].(*mistral.TextChunk).Text)
+	})
+
+	t.Run("should map request with completion config", func(t *testing.T) {
+		// Given
+		mr := &ai.ModelRequest{
+			Messages: []*ai.Message{
+				{
+					Role: ai.RoleUser,
+					Content: []*ai.Part{
+						ai.NewTextPart("Say hi"),
+					},
+				},
+			},
+		}
+		cfg := &mistral.CompletionConfig{
+			MaxTokens:   100,
+			Temperature: 0.5,
+			TopP:        0.7,
+			ResponseFormat: &mistral.ResponseFormat{
+				Type: mistral.ResponseFormatJsonObject,
+			},
+			ToolChoice:        mistral.ToolChoiceRequired,
+			ParallelToolCalls: false,
+			FrequencyPenalty:  0.1,
+			PresencePenalty:   0.3,
+			N:                 1,
+			RandomSeed:        42,
+			SafePrompt:        true,
+			Stop:              []string{"end", "."},
+			Stream:            true, // Not supported yet
+		}
+
+		// When
+		res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, cfg)
+
+		// Then
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "mistral-small-latest", res.Model)
+		assert.Equal(t, cfg.MaxTokens, res.MaxTokens)
+		assert.Equal(t, cfg.Temperature, res.Temperature)
+		assert.Equal(t, cfg.TopP, res.TopP)
+		assert.Equal(t, cfg.ToolChoice, res.ToolChoice)
+		assert.Equal(t, cfg.FrequencyPenalty, res.FrequencyPenalty)
+		assert.Equal(t, cfg.PresencePenalty, res.PresencePenalty)
+		assert.Equal(t, cfg.N, res.N)
+		assert.Equal(t, cfg.RandomSeed, res.RandomSeed)
+		assert.Equal(t, cfg.SafePrompt, res.SafePrompt)
+		assert.False(t, res.Stream)
 	})
 
 	for _, tc := range []struct {
@@ -103,7 +152,7 @@ func TestMapRequestToMistral(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr)
+			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, &mistral.CompletionConfig{})
 
 			// Then
 			assert.NoError(t, err)
@@ -138,7 +187,7 @@ func TestMapRequestToMistral(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr)
+			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, &mistral.CompletionConfig{})
 
 			// Then
 			assert.Nil(t, res)
@@ -153,7 +202,7 @@ func TestMapRequestToMistral(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr)
+			res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, &mistral.CompletionConfig{})
 
 			// Then
 			assert.Nil(t, res)
@@ -168,7 +217,7 @@ func TestMapRequestToMistral(t *testing.T) {
 			}
 
 			// When
-			res, err := mapping.MapRequestToMistral("", mr)
+			res, err := mapping.MapRequestToMistral("", mr, &mistral.CompletionConfig{})
 
 			// Then
 			assert.Nil(t, res)
@@ -206,7 +255,7 @@ func TestMapRequestToMistral(t *testing.T) {
 		}
 
 		// When
-		res, err := mapping.MapRequestToMistral("mistral-small-latest", mr)
+		res, err := mapping.MapRequestToMistral("mistral-small-latest", mr, nil)
 
 		// Then
 		assert.NoError(t, err)

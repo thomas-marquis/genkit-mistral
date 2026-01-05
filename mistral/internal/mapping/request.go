@@ -12,7 +12,7 @@ var (
 	ErrNoMessages      = errors.New("message list is empty")
 )
 
-func MapRequestToMistral(model string, mr *ai.ModelRequest) (*mistral.ChatCompletionRequest, error) {
+func MapRequestToMistral(model string, mr *ai.ModelRequest, cfg *mistral.CompletionConfig) (*mistral.ChatCompletionRequest, error) {
 	if model == "" {
 		return nil, ErrNoModelProvided
 	}
@@ -33,6 +33,12 @@ func MapRequestToMistral(model string, mr *ai.ModelRequest) (*mistral.ChatComple
 		Messages: messages,
 		Model:    model,
 	}
+
+	if cfg != nil {
+		req.CompletionConfig = *cfg
+	}
+
+	req.Stream = false
 
 	if nbTools := len(mr.Tools); nbTools > 0 {
 		tools := make([]mistral.Tool, 0, nbTools)

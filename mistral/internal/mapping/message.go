@@ -115,10 +115,6 @@ func MapToMistralMessage(msg *ai.Message) ([]mistral.ChatMessage, error) {
 		m = append(m, mistral.NewSystemMessageFromString(content))
 
 	case mistral.RoleTool:
-		//cb := strings.Builder{}
-		//var functionName, refId string
-		//var otherChunks mistral.ContentChunks
-
 		for _, part := range msg.Content {
 			if part.Kind == ai.PartToolResponse {
 				outputBytes, err := json.Marshal(part.ToolResponse.Output)
@@ -127,25 +123,8 @@ func MapToMistralMessage(msg *ai.Message) ([]mistral.ChatMessage, error) {
 				}
 				m = append(m, mistral.NewToolMessage(
 					part.ToolResponse.Name, part.ToolResponse.Ref, mistral.ContentString(outputBytes)))
-				//cb.WriteString(string(outputBytes))
-				//cb.WriteString("\n")
-				//functionName = part.ToolResponse.Name
-				//refId = part.ToolResponse.Ref
-				// TODO: is it possible to have multiple tool responses with different names and refs?
 			}
 		}
-
-		//otherChunks, err = mapMessageContent(msg.Content)
-		//
-		//if functionName != "" && refId != "" {
-		//	toolsContent := cb.String()
-		//	if len(otherChunks) == 0 {
-		//		m = append(m, mistral.NewToolMessage(functionName, refId, mistral.ContentString(toolsContent)))
-		//	} else {
-		//		m = append(m, mistral.NewToolMessage(functionName, refId,
-		//			append(mistral.ContentChunks{mistral.NewTextContent(toolsContent)}, otherChunks...)))
-		//	}
-		//}
 	}
 
 	return m, nil
