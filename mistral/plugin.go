@@ -25,6 +25,7 @@ type Option func(plugin *Plugin)
 
 // WithClient sets the client to use for the plugin.
 // For exotic use case, you can define your own mistral.Client implementation with this option.
+// Don't use it with WithClientOptions.
 func WithClient(client mistral.Client) Option {
 	return func(p *Plugin) {
 		p.Client = client
@@ -39,6 +40,14 @@ func WithClient(client mistral.Client) Option {
 func WithAPICallsDisabled() Option {
 	return func(p *Plugin) {
 		p.apiCallsDisabled = true
+	}
+}
+
+// WithClientOptions sets the options to use for the client (timeout, custom transport...).
+// Don't use it with WithClient.
+func WithClientOptions(opts ...mistral.Option) Option {
+	return func(p *Plugin) {
+		p.Client = mistral.New(p.APIKey, opts...)
 	}
 }
 
