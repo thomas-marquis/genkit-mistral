@@ -30,7 +30,7 @@ The plugin-specific part is visible only in the `NewPlugin` function, during ini
 Optionally, some options can be passed to this function:
 - `WithClient`, if you want to use a custom HTTP client (that implements the `Client` interface from `mistral-client`).
 - `WithAPICallsDisabled`, for testing purposes. Only fake models provided by `mistral-client` are available. No need to provide a valid API key.
-- `WithClientOptions`, if you want to customize the HTTP client. Avaialble options are documented [here](https://pkg.go.dev/github.com/thomas-marquis/mistral-client@v0.3.0/mistral#Option).
+- `WithClientOptions`, if you want to customize the HTTP client. Available options are documented [here](https://pkg.go.dev/github.com/thomas-marquis/mistral-client@v0.3.0/mistral#Option).
 
 Some usage examples can be found [here](https://github.com/thomas-marquis/genkit-examples) and in the current repo's `/examples` folder.
 
