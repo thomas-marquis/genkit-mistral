@@ -3,9 +3,9 @@ module github.com/thomas-marquis/genkit-mistral
 go 1.25
 
 require (
-	github.com/firebase/genkit/go v1.2.0
+	github.com/firebase/genkit/go v1.4.0
 	github.com/stretchr/testify v1.11.1
-	github.com/thomas-marquis/mistral-client v0.2.0
+	github.com/thomas-marquis/mistral-client v0.3.0
 	go.uber.org/mock v0.6.0
 )
 

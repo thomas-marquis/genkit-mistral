@@ -56,6 +56,21 @@ func (mr *MockClientMockRecorder) ChatCompletion(ctx, req any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChatCompletion", reflect.TypeOf((*MockClient)(nil).ChatCompletion), ctx, req)
 }
 
+// ChatCompletionStream mocks base method.
+func (m *MockClient) ChatCompletionStream(ctx context.Context, req *mistral.ChatCompletionRequest) (<-chan *mistral.CompletionChunk, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChatCompletionStream", ctx, req)
+	ret0, _ := ret[0].(<-chan *mistral.CompletionChunk)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ChatCompletionStream indicates an expected call of ChatCompletionStream.
+func (mr *MockClientMockRecorder) ChatCompletionStream(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChatCompletionStream", reflect.TypeOf((*MockClient)(nil).ChatCompletionStream), ctx, req)
+}
+
 // Embeddings mocks base method.
 func (m *MockClient) Embeddings(ctx context.Context, req *mistral.EmbeddingRequest) (*mistral.EmbeddingResponse, error) {
 	m.ctrl.T.Helper()
