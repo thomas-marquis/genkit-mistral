@@ -264,14 +264,11 @@ func TestMapRequestToMistral(t *testing.T) {
 
 		assert.Equal(t, &mistral.JsonSchema{
 			Name: "responseJsonSchema",
-			Schema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"greeting": map[string]any{
-						"type": "string",
-					},
+			Schema: mistral.NewObjectPropertyDefinition(map[string]mistral.PropertyDefinition{
+				"greeting": {
+					Type: "string",
 				},
-			},
+			}),
 			Strict: true,
 		}, res.ResponseFormat.JsonSchema)
 	})

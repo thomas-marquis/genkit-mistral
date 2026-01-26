@@ -43,14 +43,15 @@ func MapRequestToMistral(model string, mr *ai.ModelRequest, cfg *mistral.Complet
 	if nbTools := len(mr.Tools); nbTools > 0 {
 		tools := make([]mistral.Tool, 0, nbTools)
 		for _, tool := range mr.Tools {
-			tools = append(tools, mistral.NewTool(tool.Name, tool.Description, tool.InputSchema))
+			tools = append(tools, mistral.NewTool(tool.Name, tool.Description,
+				mistral.NewPropertyDefinition(tool.InputSchema)))
 		}
 		mistral.WithTools(tools)(req)
 		req.ToolChoice = mapToMistralToolChoice(mr.ToolChoice)
 	}
 
 	if mr.Output != nil && mr.Output.Constrained && mr.Output.Format == "json" {
-		mistral.WithResponseJsonSchema(mr.Output.Schema)(req)
+		mistral.WithResponseJsonSchema(mistral.NewPropertyDefinition(mr.Output.Schema))(req)
 	} else {
 		mistral.WithResponseTextFormat()(req)
 	}
