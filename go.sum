@@ -5,8 +5,8 @@ github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx2
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/firebase/genkit/go v1.2.0 h1:C31p32vdMZhhSSQQvXouH/kkcleTH4jlgFmpqlJtBS4=
-github.com/firebase/genkit/go v1.2.0/go.mod h1:ru1cIuxG1s3HeUjhnadVveDJ1yhinj+j+uUh0f0pyxE=
+github.com/firebase/genkit/go v1.4.0 h1:CP1hNWk7z0hosyY53zMH6MFKFO1fMLtj58jGPllQo6I=
+github.com/firebase/genkit/go v1.4.0/go.mod h1:HX6m7QOaGc3MDNr/DrpQZrzPLzxeuLxrkTvfFtCYlGw=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -39,8 +39,8 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/thomas-marquis/mistral-client v0.2.0 h1:osAFZN7nR6Pk7JQi8/tPp8XnM3PTrzZIBixL9iuCLrg=
-github.com/thomas-marquis/mistral-client v0.2.0/go.mod h1:b9w+cW78u2jdDR7xTFOGYTKohZkOz2Ie8MshM3grMtw=
+github.com/thomas-marquis/mistral-client v0.4.0 h1:KSwE1VrcKrWUzmnPtJUkRpTaDT0VkqMx46uF+IzpI54=
+github.com/thomas-marquis/mistral-client v0.4.0/go.mod h1:x7SBUi4pRm7Dzmle7QBi48ToNrTdZcK0i280NgnUo/c=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
 github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=

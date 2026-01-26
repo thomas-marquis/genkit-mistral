@@ -8,13 +8,18 @@ import (
 func MapToGenkitResponse(mr *ai.ModelRequest, resp *mistral.ChatCompletionResponse) (*ai.ModelResponse, error) {
 	var parts []*ai.Part
 
-	response := &ai.ModelResponse{
-		Request: mr,
-		Usage: &ai.GenerationUsage{
+	var usage *ai.GenerationUsage
+	if resp.Usage != nil {
+		usage = &ai.GenerationUsage{
 			InputTokens:  resp.Usage.PromptTokens,
 			OutputTokens: resp.Usage.CompletionTokens,
 			TotalTokens:  resp.Usage.TotalTokens,
-		},
+		}
+	}
+
+	response := &ai.ModelResponse{
+		Request:   mr,
+		Usage:     usage,
 		LatencyMs: float64(resp.Latency.Milliseconds()),
 	}
 

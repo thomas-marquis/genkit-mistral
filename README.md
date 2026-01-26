@@ -2,7 +2,13 @@
 
 Enables Mistral AI support for Firebase Genkit (Go SDK). Build agents and apps with Genkit while calling Mistral models and embeddings with a clean, typed Go API.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/thomas-marquis/genkit-mistral.svg)](https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENCE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/thomas-marquis/genkit-mistral.svg)](https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral)
+[![CI](https://github.com/thomas-marquis/genkit-mistral/actions/workflows/ci.yml/badge.svg)](https://github.com/thomas-marquis/genkit-mistral/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENCE)
+
+<p align="center">
+  <img src="resources/assets/logo-tr.png" width="350" alt="genkit-mistral logo">
+</p>
 
 ## Quick start 🚀
 
@@ -18,6 +24,15 @@ go get github.com/thomas-marquis/genkit-mistral
 See the full API and more examples in the Go reference: https://pkg.go.dev/github.com/thomas-marquis/genkit-mistral
 
 Check the [Genkit's documentation](https://genkit.dev/go/docs/models/) for more insights.
+
+Genkit-mistral is just a Genkit plugin. So, it doesn't change the way you use Genkit (and you can change the plugin without modifying your code).
+The plugin-specific part is visible only in the `NewPlugin` function, during initialization.
+Optionally, some options can be passed to this function:
+- `WithClient`, if you want to use a custom HTTP client (that implements the `Client` interface from `mistral-client`).
+- `WithAPICallsDisabled`, for testing purposes. Only fake models provided by `mistral-client` are available. No need to provide a valid API key.
+- `WithClientOptions`, if you want to customize the HTTP client. Available options are documented [here](https://pkg.go.dev/github.com/thomas-marquis/mistral-client@v0.3.0/mistral#Option).
+
+Some usage examples can be found [here](https://github.com/thomas-marquis/genkit-examples) and in the current repo's `/examples` folder.
 
 ### Basit text generation
 
@@ -136,6 +151,16 @@ func main() {
 }
 ```
 
+### Use fake models (for testing or local development)
+
+These two fake models are available:
+- `mistral/fake-completiont`: return some Lorem Ipsum text
+- `mistral/fake-embed`: return random embedding vectors
+
+Why use fake models?
+- For integration tests, when what you want to test does not depend on the actual result of the model
+- For local development, when you just want to know if your application starts or runs correctly
+
 ## Models and embeddings 🧠
 
 You can find all tes mistral models with this command:
@@ -146,14 +171,17 @@ curl --request GET \
   --header 'Authorization: Bearer <your API token>'
 ```
 
+This library is built on top of [mistral-client](https://github.com/thomas-marquis/mistral-client).
+A method `ListModels` is available from this one to list all available models.
 
 ## Useful resources 📚
 
-| Resource      | For what?                                      | Link(s)                                                                                                             |
-|---------------|-------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| Mistral AI    | French AI provider                              | [Website](https://mistral.ai/) <br/> [API documentation](https://docs.mistral.ai/api/)                              |
-| Genkit        | Agentic framework (Go, Node.js, Python)         | [Docs](https://firebase.google.com/docs/genkit) <br/> [Go SDK](https://genkit.dev/go/docs/get-started-go/)          |
-| La Plateforme | Mistral's cloud platform for developers         | [Website](https://mistral.ai/products/la-plateforme) <br/> [Pricing](https://mistral.ai/pricing#api-pricing)        |
+| Resource       | For what?                            | Link(s)                                                                                                      |
+|----------------|--------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| Mistral AI     | French AI provider                   | [Website](https://mistral.ai/) <br/> [API documentation](https://docs.mistral.ai/api/)                       |
+| Genkit         | Agentic framework (Go, Node.js, Python) | [Docs](https://firebase.google.com/docs/genkit) <br/> [Go SDK](https://genkit.dev/go/docs/get-started-go/)   |
+| La Plateforme  | Mistral's cloud platform for developers | [Website](https://mistral.ai/products/la-plateforme) <br/> [Pricing](https://mistral.ai/pricing#api-pricing) |
+| mistral-client | HTTP client for Mistral AI written in Go. | [Repo](https://github.com/thomas-marquis/mistral-client) <br/> [Documentation](https://thomas-marquis.github.io/mistral-client/)                                                                             |
 
 ## Contributing 🤝
 

@@ -20,7 +20,7 @@ func TestMapToGenkitResponse(t *testing.T) {
 					FinishReason: mistral.FinishReasonStop,
 				},
 			},
-			Usage: mistral.UsageInfo{
+			Usage: &mistral.UsageInfo{
 				PromptTokens:     10,
 				CompletionTokens: 100,
 				TotalTokens:      110,
@@ -49,6 +49,38 @@ func TestMapToGenkitResponse(t *testing.T) {
 		assert.Equal(t, "Hello simple human being!", content[0].Text)
 	})
 
+	t.Run("should still map response with empty usage", func(t *testing.T) {
+		// Given
+		resp := &mistral.ChatCompletionResponse{
+			Choices: []mistral.ChatCompletionChoice{
+				{
+					Message:      mistral.NewAssistantMessageFromString("Hello simple human being!"),
+					FinishReason: mistral.FinishReasonStop,
+				},
+			},
+			Usage:   nil,
+			Latency: 3 * time.Second,
+		}
+		mr := &ai.ModelRequest{}
+
+		// When
+		res, err := mapping.MapToGenkitResponse(mr, resp)
+
+		// Then
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, mr, res.Request)
+		assert.Nil(t, res.Usage)
+		assert.Equal(t, float64(3000), res.LatencyMs)
+		assert.Equal(t, ai.FinishReason("stop"), res.FinishReason)
+		assert.Equal(t, "Hello simple human being!", res.Text())
+
+		content := res.Message.Content
+		assert.Equal(t, 1, len(content))
+		assert.Equal(t, ai.PartText, content[0].Kind)
+		assert.Equal(t, "Hello simple human being!", content[0].Text)
+	})
+
 	t.Run("should map response with tool calls", func(t *testing.T) {
 		// Given
 		resp := &mistral.ChatCompletionResponse{
@@ -63,7 +95,7 @@ func TestMapToGenkitResponse(t *testing.T) {
 					FinishReason: mistral.FinishReasonToolCalls,
 				},
 			},
-			Usage: mistral.UsageInfo{
+			Usage: &mistral.UsageInfo{
 				PromptTokens:     10,
 				CompletionTokens: 100,
 				TotalTokens:      110,
